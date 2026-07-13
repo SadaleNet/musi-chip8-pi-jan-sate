@@ -1,0 +1,525 @@
+# SPDX-FileCopyrightText: 2026 Wong Cho Ching <https://sadale.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# Traffic light game. Made for the game jam "Ludum Dare 59"
+
+: font # 7x8 font
+0x99 0x24 0x7E 0x24 0x7E 0x24 0x18 # akesi
+0x3C 0x42 0x42 0x42 0x3C 0x42 0x81 # jan
+0x00 0x8E 0x51 0x21 0x51 0x8E 0x00 # kala
+0x04 0x6A 0x92 0x7C 0x10 0x10 0x10 # kasi
+0x10 0x54 0xBA 0x82 0x82 0x44 0x38 # kili
+0x92 0x38 0x10 0x7C 0x10 0x7C 0x10 # pipi
+0x3E 0x01 0x15 0x01 0xFF 0xAA 0xAA # soewli
+0x08 0x04 0x52 0x02 0x1E 0x10 0x10 # waso
+0xFF 0x89 0x91 0xBD 0x89 0x91 0xFF # pakala
+
+: tarffic-light # 4x15
+0x60 0xF0 0x90 0x90 0xF0 0x90 0x90 0xF0 0x90 0x90 0xF0 0x60 0x60 0x60 0x60 # traffic light base
+
+: tarffic-light-transition # 4x15
+0x00 0x00 0x00 0x00 0x00 0x60 0x60 0x00 0x60 0x60 0x00 0x00 0x00 0x00 0x00 # transition from blank to red
+0x00 0x00 0x00 0x00 0x00 0x60 0x60 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 # transition to orange
+0x00 0x00 0x60 0x60 0x00 0x60 0x60 0x00 0x60 0x60 0x00 0x00 0x00 0x00 0x00 # transition to green
+0x00 0x00 0x00 0x00 0x00 0x60 0x60 0x00 0x60 0x60 0x00 0x00 0x00 0x00 0x00 # transition back to yellow
+0x00 0x00 0x60 0x60 0x00 0x60 0x60 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 # transition back to red
+
+: horizontal-bar-7 0xFE
+: vertical-bar 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 
+: dotted-vertical-line 0x80 0x80 0x00 0x80 0x80 0x00 0x80 0x80 0x00 0x80 0x80 0x00 0x80 0x80
+
+: bcd-buffer 0x00 0x00 0x00
+: previous-held-button-buffer-a 0xFF
+: previous-held-button-buffer-b 0xFF
+
+:const WARNING_LIGHT 5
+
+# v0,1,2, c,d,f are scratchpad
+# v3 is the score
+# v4,5,6 7,8,9 are the icons. If it's the answer, bit7 is 1, else 0
+# va,b are for timing (For GREEN, bit7 is 1, else 0)
+# ve is button press
+
+: draw-background
+	i := horizontal-bar-7
+	v1 := vc
+	v2 := 8
+	sprite v1 v2 1
+	v2 := 18
+	sprite v1 v2 1
+	v1 += 17
+	v2 := 8
+	sprite v1 v2 1
+	v2 := 18
+	sprite v1 v2 1
+
+	i := vertical-bar
+	v1 := vc
+	v1 += 6
+	v2 := 0
+	sprite v1 v2 8
+	v2 := 19
+	sprite v1 v2 13
+	v1 += 11
+	v2 := 0
+	sprite v1 v2 8
+	v2 := 19
+	sprite v1 v2 13
+
+	i := dotted-vertical-line
+	v1 := vc
+	v1 += 11
+	v2 := 18
+	sprite v1 v2 14
+
+	i := tarffic-light
+	v1 += 16
+	v2 := 15
+	sprite v1 v2 15
+
+	return
+
+: draw-traffic-light
+	i := tarffic-light-transition
+	v0 := 15
+	if vd != 0 begin
+		loop
+			i += v0
+			vd -= 1
+			if vd > 0 then
+		again
+	end
+
+	if vc == 0 then v0 := 27
+	if vc == 1 then v0 := 59
+	vd := 15
+	sprite v0 vd 15
+
+	return
+
+: draw-score
+	i := bcd-buffer
+	bcd v3
+	load v2
+	i := hex v0
+	vc := 21
+	vd := 1
+	sprite vc vd 5
+	i := hex v1
+	vc := 26
+	sprite vc vd 5
+	i := hex v2
+	vc := 31
+	sprite vc vd 5
+	return
+
+: increment-score
+	:call draw-score
+	v3 += 1
+	:call draw-score
+	return
+
+: draw-init-numbers
+	v0 := 1
+	i := hex v0
+	v1 := 0
+	v2 := 11
+	sprite v1 v2 5
+
+	v0 := 3
+	i := hex v0
+	v1 := 18
+	sprite v1 v2 5
+
+	v0 := 4
+	i := hex v0
+	v1 := 33
+	sprite v1 v2 5
+
+	v0 := 6
+	i := hex v0
+	v1 := 50
+	sprite v1 v2 5
+
+	v0 := 2
+	i := hex v0
+	v1 := 9
+	v2 := 1
+	sprite v1 v2 5
+
+	v0 := 5
+	i := hex v0
+	v1 := 42
+	v2 := 1
+	sprite v1 v2 5
+
+	return
+
+: draw-word
+	i := font
+	vc := 0x7F
+	v0 &= vc # remove the answer flag
+	if v0 > 0 begin
+		loop
+			v0 -= 1
+			vf := 7
+			i += vf
+			if v0 > 0 then
+		again
+	end
+	sprite v1 v2 7
+	return
+
+
+: draw-words-a
+	v0 := v4
+	v1 := 0
+	v2 := 10
+	:call draw-word
+	v0 := v5
+	v1 := 8
+	v2 := 1
+	:call draw-word
+	v0 := v6
+	v1 := 16
+	v2 := 10
+	:call draw-word
+	return
+
+: draw-words-b
+	v0 := v7
+	v1 := 32
+	v2 := 10
+	:call draw-word
+	v0 := v8
+	v1 := 40
+	v2 := 1
+	:call draw-word
+	v0 := v9
+	v1 := 48
+	v2 := 10
+	:call draw-word
+	return
+
+
+: draw-answer-a
+	if v4 >= 0x80 then v0 := v4
+	if v5 >= 0x80 then v0 := v5
+	if v6 >= 0x80 then v0 := v6
+	v1 := 19
+	v2 := 20
+	:call draw-word
+	return
+
+: draw-answer-b
+	if v7 >= 0x80 then v0 := v7
+	if v8 >= 0x80 then v0 := v8
+	if v9 >= 0x80 then v0 := v9
+	v1 := 51
+	v2 := 20
+	:call draw-word
+	return
+
+: game-over
+	if vc == 0x1 begin
+		v0 := v4 v1 := 0 v2 := 10 :call draw-word
+		v0 := 8 :call draw-word
+	end
+	if vc == 0x2 begin
+		v0 := v5 v1 := 8 v2 := 1 :call draw-word
+		v0 := 8 :call draw-word
+	end
+	if vc == 0x3 begin
+		v0 := v6 v1 := 16 v2 := 10 :call draw-word
+		v0 := 8 :call draw-word
+	end
+	if vc == 0xA begin
+		if va >= 0x80 then :call draw-answer-a
+		v0 := 8 v1 := 19 v2 := 20 :call draw-word
+	end
+
+	if vc == 0x4 begin
+		v0 := v7 v1 := 32 v2 := 10 :call draw-word
+		v0 := 8 :call draw-word
+	end
+	if vc == 0x5 begin
+		v0 := v8 v1 := 40 v2 := 1 :call draw-word
+		v0 := 8 :call draw-word
+	end
+	if vc == 0x6 begin
+		v0 := v9 v1 := 48 v2 := 10 :call draw-word
+		v0 := 8 :call draw-word
+	end
+	if vc == 0xB begin
+		if vb >= 0x80 then :call draw-answer-b
+		v0 := 8 v1 := 51 v2 := 20 :call draw-word
+	end
+	
+	# Draw F to tell the user to reply by pressing F
+	v0 := 0x0F
+	i := hex v0
+	v1 := 55 v2 := 1
+	sprite v1 v2 5
+	# wait for keypress
+	ve := 0x0F
+	loop
+		if ve key then jump main
+	again
+		
+
+: reroll-a
+	if v4 != 255 then :call draw-words-a
+	v4 := random 0x07
+
+	: reroll5
+	v5 := random 0x07
+	if v5 == v4 then
+		jump reroll5
+
+	: reroll6
+	v6 := random 0x07
+	if v6 == v4 then
+		jump reroll6
+	if v6 == v5 then
+		jump reroll6
+
+	:call draw-words-a
+	loop
+		v0 := random 0x03 # answer
+		if v0 == 0 then
+	again
+	v1 := 0x80
+	if v0 == 1 then v4 |= v1
+	if v0 == 2 then v5 |= v1
+	if v0 == 3 then v6 |= v1
+	return
+
+
+: reroll-b
+	if v7 != 255 then :call draw-words-b
+	v7 := random 0x07
+
+	: reroll8
+	v8 := random 0x07
+	if v8 == v7 then
+		jump reroll8
+
+	: reroll9
+	v9 := random 0x07
+	if v9 == v7 then
+		jump reroll9
+	if v9 == v8 then
+		jump reroll9
+
+	:call draw-words-b
+
+	loop
+		v0 := random 0x03 # answer
+		if v0 == 0 then
+	again
+	v1 := 0x80
+	if v0 == 1 then v7 |= v1
+	if v0 == 2 then v8 |= v1
+	if v0 == 3 then v9 |= v1
+	return
+
+:macro button-handler V_TIMER TRAFFIC_INDEX VBTN1 VBTN2 VBTN3 BTN1 BTN2 BTN3 ANSWER DRAW_ANSWER REROLL PREVIOUS_HELD_BUFFER {
+	if V_TIMER < 0x80 begin
+		# red light
+		vc := ANSWER jump game-over
+	else
+		# green light
+		# wrong button! game over!
+		if ve == BTN1 begin
+			if VBTN1 < 0x80 begin
+				vc := BTN1 jump game-over
+			end
+		end
+		if ve == BTN2 begin
+			if VBTN2 < 0x80 begin
+				vc := BTN2 jump game-over
+			end
+		end
+		if ve == BTN3 begin
+			if VBTN3 < 0x80 begin
+				vc := BTN3 jump game-over
+			end
+		end
+		# correct!
+		i := PREVIOUS_HELD_BUFFER
+		v0 := ve
+		save v0
+
+		:call DRAW_ANSWER
+		:call increment-score
+		if v3 == 255 begin
+			# Max score reached. game over!
+			vc := 0x0F jump game-over
+		end
+
+		v0 := 0x7F
+		V_TIMER &= v0
+		if V_TIMER > WARNING_LIGHT begin
+			vc := TRAFFIC_INDEX vd := 3 :call draw-traffic-light
+		end
+		vc := TRAFFIC_INDEX vd := 4 :call draw-traffic-light
+		:call REROLL
+		# Set red time based on the current score
+		V_TIMER := random 0x03
+		if v3 < 5 then V_TIMER += 3
+		if v3 < 10 then V_TIMER += 3
+		if v3 < 20 then V_TIMER += 2
+		if v3 < 30 then V_TIMER += 2
+		if v3 < 50 then V_TIMER += 1
+		if v3 < 75 then V_TIMER += 1
+		if v3 < 100 then V_TIMER += 1
+		if v3 < 150 then V_TIMER += 1
+		if v3 < 200 then V_TIMER += 1
+		# a chance to desynchronize the traffic light
+		v0 := random 0xFF if v0 >= 200 begin
+			vc := TRAFFIC_INDEX
+			if vc == 0 then V_TIMER += 15
+			if vc == 1 then V_TIMER := 3
+		end
+		V_TIMER += WARNING_LIGHT
+	end
+}
+
+
+:macro frame-handler V_TIMER TRAFFIC_INDEX DRAW_ANSWER {
+	V_TIMER -= 1
+	if V_TIMER >= 0x80 begin
+		# green light
+		v0 := V_TIMER
+		v1 := 0x7F
+		v0 &= v1
+		if v0 == WARNING_LIGHT begin
+			vc := TRAFFIC_INDEX vd := 3 :call draw-traffic-light
+		end
+		if v0 == 0 begin
+			vc := TRAFFIC_INDEX vd := 4 :call draw-traffic-light
+			vc := TRAFFIC_INDEX
+			if vc == 0 begin
+				vc := 0x0A jump game-over
+			end
+			vc := 0x0B jump game-over
+		end
+	else
+		# red light
+		if V_TIMER == WARNING_LIGHT begin
+			vc := TRAFFIC_INDEX
+			vd := 1
+			:call draw-traffic-light
+		end
+		if V_TIMER == 0 begin
+			vc := TRAFFIC_INDEX
+			vd := 2
+			:call draw-traffic-light
+			:call DRAW_ANSWER
+			
+			# Set green timer based on the current score
+			V_TIMER := 0x80
+			if v3 < 5 then V_TIMER += 3
+			if v3 < 10 then V_TIMER += 3
+			if v3 < 20 then V_TIMER += 2
+			if v3 < 30 then V_TIMER += 2
+			if v3 < 50 then V_TIMER += 1
+			if v3 < 75 then V_TIMER += 1
+			if v3 < 100 then V_TIMER += 1
+			if v3 < 150 then V_TIMER += 1
+			if v3 < 200 then V_TIMER += 1
+			V_TIMER += 6
+		end
+	end
+}
+
+
+: main
+clear
+vc := 0
+:call draw-background
+vc := 32
+:call draw-background
+
+v3 := 0
+:call draw-score
+
+
+vb := 10
+loop
+	:call draw-init-numbers
+	va := 15
+	delay := va
+	loop
+		va := delay
+		if va > 0 then
+	again
+	vb -= 1
+	if vb > 0 then
+again
+
+# tick speed: 6 frames
+va := 20
+vb := 50
+
+vc := 0
+vd := 0
+:call draw-traffic-light
+v4 := 255 :call reroll-a
+vc := 1
+vd := 0
+:call draw-traffic-light
+
+v7 := 255 :call reroll-b
+
+vf := 6
+delay := vf
+loop
+
+	ve := 1
+	loop
+		if ve key begin
+			if ve <= 3 begin
+				i := previous-held-button-buffer-a
+				load v0
+			else
+				i := previous-held-button-buffer-b
+				load v0
+			end
+			if ve != v0 begin # only handle button if the button were not previously held. i.e. only handle on-press event
+				if ve <= 3 begin
+					button-handler va 0 v4 v5 v6 1 2 3 0x0A draw-answer-a reroll-a previous-held-button-buffer-a # handle the left section
+				else
+					button-handler vb 1 v7 v8 v9 4 5 6 0x0B draw-answer-b reroll-b previous-held-button-buffer-b # handle the right section
+				end
+			end
+		else
+			i := previous-held-button-buffer-a
+			load v0
+			if ve == v0 begin
+				v0 := 0xFF
+				i := previous-held-button-buffer-a
+				save v0
+			end
+			i := previous-held-button-buffer-b
+			load v0
+			if ve == v0 begin
+				v0 := 0xFF
+				i := previous-held-button-buffer-b
+				save v0
+			end
+		end
+
+		ve += 1
+		if ve <= 6 then
+	again
+	v0 := delay
+	if v0 == 0 begin
+		vf := 6
+		delay := vf
+		# next frame!
+		frame-handler va 0 draw-answer-a 
+		frame-handler vb 1 draw-answer-b
+	end
+again

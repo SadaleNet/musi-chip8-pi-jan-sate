@@ -1,0 +1,500 @@
+# SPDX-FileCopyrightText: 2026 Wong Cho Ching <https://sadale.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# Image matching game. Made for the game jam "pali musi 2026"
+
+# Registers allocation
+# v0~3: scratch register
+# v4: function parameters
+# v5: answer
+# v6: winning condition. 0 is gameplay, 1 is win, 2 is lose
+# v7: last selected pattern (for removal upon next selection)
+# v8: timer
+# v9: level / score
+# va~c: Drawing registers
+# ve: button press loop
+# vf: carry register
+
+: patterns 
+	0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF
+	0xF0 0xF0 0xF0 0xF0 0xF0 0xF0 0xF0 0xF0
+	0x00 0x00 0x00 0x00 0xFF 0xFF 0xFF 0xFF
+	0x3C 0x3C 0x3C 0x3C 0x3C 0x3C 0x3C 0x3C
+	0x00 0x00 0xFF 0xFF 0xFF 0xFF 0x00 0x00
+	0x03 0x07 0x0E 0x1C 0x38 0x70 0xE0 0xC0
+	0xC0 0xE0 0x70 0x38 0x1C 0x0E 0x07 0x03
+	0xFF 0x81 0xBD 0xA5 0xA5 0xBD 0x81 0xFF
+	0xAA 0x55 0xAA 0x55 0xAA 0x55 0xAA 0x55
+
+: frame 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x80
+
+: glyphs
+	0x3E 0x01 0x15 0x01 0x01 0xFF 0xAA 0xAA # soweli
+	0x3C 0x42 0x42 0x42 0x42 0x3C 0x42 0x81 # jan
+	0x3C 0x42 0x81 0x99 0x99 0x81 0x42 0x3C # sike
+	0x81 0x42 0x24 0x00 0x00 0x24 0x42 0x81 # weka
+	0x18 0x24 0x24 0xFF 0x42 0x81 0x81 0xFF # kule
+	0x66 0x99 0x99 0xA5 0x5A 0x24 0x24 0x18 # unpa
+	0x90 0x90 0x90 0x9C 0x82 0x81 0x81 0xFE # noka
+	0xFF 0x81 0x81 0x81 0x81 0xFF 0x99 0x99 # len
+
+: wile 0x00 0x00 0x8A 0xA8 0xA8 0x52 0x00 0x00
+: sina 0x00 0x40 0x42 0x70 0x48 0x4A 0x30 0x00
+
+: dot 0x80
+: line 0xFF
+: pakala 0xFF 0x89 0x91 0xBD 0x89 0x91 0xFF 0x00
+: wawa 0x81 0x81 0x99 0xA5 0xA5 0x99 0x42 0x42
+
+: bcd-buffer 0x00 0x00 0x00
+: last-keyheld 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+
+: draw-frame
+	i := frame
+	sprite va vb 10
+	va += 9
+	i := frame
+	sprite va vb 10
+;
+
+: load-glyph-to-i
+	i := glyphs
+	v0 := v5
+	v1 := 8
+	if v0 > 0 begin
+		loop
+			i += v1
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+;
+
+: draw-background
+	clear
+	# wile
+	va := 1
+	vb := 1
+	i := wile
+	sprite va vb 8
+	va := 9
+	vb := 0
+	draw-frame
+	# draw wile content
+	va := 10
+	vb := 1
+	load-glyph-to-i
+	sprite va vb 8
+
+	# sina
+	va := 1
+	vb := 13
+	i := sina
+	sprite va vb 8
+	va := 9
+	vb := 12
+	draw-frame
+	# draw sina content
+	va := 10
+	vb := 13
+	load-glyph-to-i
+	sprite va vb 8
+
+	# score
+	i := bcd-buffer
+	bcd v9
+	load v2
+	i := hex v0
+	va := 3
+	vb := 25
+	sprite va vb 5
+	i := hex v1
+	va := 8
+	sprite va vb 5
+	i := hex v2
+	va := 13
+	sprite va vb 5
+
+	# patterns
+	vc := 8
+
+	va := 32
+	vb := 1
+	i := patterns
+	sprite va vb 8
+
+	va := 42
+	i += vc
+	sprite va vb 8
+
+	va := 52
+	i += vc
+	sprite va vb 8
+
+	if v9 >= 3 begin
+	va := 32
+	vb := 11
+	i += vc
+	sprite va vb 8
+
+	va := 42
+	i += vc
+	sprite va vb 8
+	end
+
+	if v9 >= 5 begin
+	va := 52
+	i += vc
+	sprite va vb 8
+
+	va := 32
+	vb := 21
+	i += vc
+	sprite va vb 8
+	end
+
+	if v9 >= 10 begin
+	va := 42
+	i += vc
+	sprite va vb 8
+
+	va := 52
+	i += vc
+	sprite va vb 8
+	end
+
+	# timer
+	i := line
+	va := 0
+	vb := 63
+	loop
+		sprite va vb 1
+		va += 8
+		if va < 64 then
+	again
+;
+
+: draw-frame-for-pattern
+	if v4 == 0 then return
+	if v4 > 9 then return
+	if v4 == 1 begin va := 31 vb := 0 end
+	if v4 == 2 begin va := 41 vb := 0 end
+	if v4 == 3 begin va := 51 vb := 0 end
+	if v4 == 4 begin va := 31 vb := 10 end
+	if v4 == 5 begin va := 41 vb := 10 end
+	if v4 == 6 begin va := 51 vb := 10 end
+	if v4 == 7 begin va := 31 vb := 20 end
+	if v4 == 8 begin va := 41 vb := 20 end
+	if v4 == 9 begin va := 51 vb := 20 end
+	draw-frame
+;
+
+: apply-image-to-answer # i is the image index base, v4 is the offset
+	# draw pattern over the answer
+	va := 10
+	vb := 13
+	v0 := 8
+	if v4 > 0 begin
+		loop
+		i += v0
+		v4 -= 1
+		if v4 > 0 then
+		again
+	end
+	sprite va vb 8
+;
+
+: handle-keyheld-event # v4 is the button being held
+	i := last-keyheld
+	v4 -= 1
+	if v4 > 0 begin
+		loop
+			v0 := 1
+			i += v0
+			v4 -= 1
+			if v4 > 0 then
+		again
+	end
+	v0 := 0x01
+	save v0
+;
+
+: change-pattern-highlight
+	v0 := v4
+	v4 := v7
+	draw-frame-for-pattern
+	v4 := v0
+	draw-frame-for-pattern
+	v7 := v0
+;
+
+: check-winning-condition
+	v3 := 0
+	v4 := 0
+	load-glyph-to-i
+	apply-image-to-answer
+
+	i := patterns # filled block
+	apply-image-to-answer
+	if vf == 0 then v3 := 1
+	i := patterns # filled block
+	apply-image-to-answer
+
+	load-glyph-to-i
+	apply-image-to-answer
+	if v3 == 1 then v6 := 1
+;
+	
+
+	# TODO: check for inverted condition here
+;
+
+: handle-keyrelease-event # v4 is the button being released
+	i := last-keyheld
+	v4 -= 1
+	if v4 > 0 begin
+		loop
+			v0 := 1
+			i += v0
+			v4 -= 1
+			if v4 > 0 then
+		again
+	end
+	v0 := 0x00
+	save v0
+;
+
+: is-key-previously-held # v4 is the button being queried. v4 is also the return value
+	i := last-keyheld
+	v4 -= 1
+	if v4 > 0 begin
+		loop
+			v0 := 1
+			i += v0
+			v4 -= 1
+			if v4 > 0 then
+		again
+	end
+	load v0
+	v4 := v0
+;
+
+: reload-timer
+	if v9 < 29 begin
+		v1 := 30
+		v1 -= v9
+		v0 := v1
+	else
+		v0 := 1
+	end
+	delay := v0
+	
+;
+
+: reduce-timer
+	v8 -= 1
+	v0 := v8
+	v1 := 0x3
+	v0 &= v1
+	if v0 == 0 begin # v8 & v3 == 3
+		va := v8
+		va >>= va
+		va >>= va
+		i := dot
+		vb := 63
+		sprite va vb 1
+	end
+	if v8 > 0 begin
+		reload-timer
+	else
+		v6 := 2
+		i := pakala
+		va := 21
+		vb := 22
+		sprite va vb 8
+	end
+;
+
+: new-level
+	v5 := random 0x07
+	draw-background
+
+	if v9 == 0 begin
+		loop
+			v0 := random 0x03
+			if v0 == 3 then
+		again
+		v4 := v0
+		i := patterns
+		apply-image-to-answer
+	end
+	v0 := 0
+	if v9 == 1 then v0 := 1
+	if v9 == 2 then v0 := 1
+	if v0 == 1 begin # v9 == 1 or v9 == 2
+		loop
+			v0 := random 0x03
+			if v0 == 3 then
+		again
+		if v0 == 0 begin
+			v4 := 1 i := patterns apply-image-to-answer
+			v4 := 2 i := patterns apply-image-to-answer
+		end
+		if v0 == 1 begin
+			v4 := 0 i := patterns apply-image-to-answer
+			v4 := 2 i := patterns apply-image-to-answer
+		end
+		if v0 == 2 begin
+			v4 := 0 i := patterns apply-image-to-answer
+			v4 := 1 i := patterns apply-image-to-answer
+		end
+	end
+
+	if v9 >= 3 begin
+		v0 := random 0x01
+		if v0 == 1 begin
+			v4 := 0 i := patterns apply-image-to-answer
+		end
+
+		loop
+			v0 := random 0x07
+			if v0 > 5 then
+		again
+		if v0 == 0 begin
+			v4 := 1 i := patterns apply-image-to-answer
+			v4 := 2 i := patterns apply-image-to-answer
+		end
+		if v0 == 1 begin
+			v4 := 1 i := patterns apply-image-to-answer
+			v4 := 3 i := patterns apply-image-to-answer
+		end
+		if v0 == 2 begin
+			v4 := 1 i := patterns apply-image-to-answer
+			v4 := 4 i := patterns apply-image-to-answer
+		end
+		if v0 == 3 begin
+			v4 := 2 i := patterns apply-image-to-answer
+			v4 := 3 i := patterns apply-image-to-answer
+		end
+		if v0 == 4 begin
+			v4 := 2 i := patterns apply-image-to-answer
+			v4 := 4 i := patterns apply-image-to-answer
+		end
+		if v0 == 5 begin
+			v4 := 3 i := patterns apply-image-to-answer
+			v4 := 4 i := patterns apply-image-to-answer
+		end
+	end
+	if v9 >= 5 begin
+		v0 := random 0x03
+		if v0 == 0 begin
+			# do nothing!
+		end
+		if v0 == 1 begin
+			v4 := 5 i := patterns apply-image-to-answer
+		end
+		if v0 == 2 begin
+			v4 := 6 i := patterns apply-image-to-answer
+		end
+		if v0 == 3 begin
+			v4 := 5 i := patterns apply-image-to-answer
+			v4 := 6 i := patterns apply-image-to-answer
+		end
+	end
+	if v9 >= 10 begin
+		v0 := random 0x03
+		if v0 == 0 begin
+				# do nothing!
+		end
+		if v0 == 1 begin
+			v4 := 7 i := patterns apply-image-to-answer
+		end
+		if v0 == 2 begin
+			v4 := 8 i := patterns apply-image-to-answer
+		end
+		if v0 == 3 begin
+			v4 := 7 i := patterns apply-image-to-answer
+			v4 := 8 i := patterns apply-image-to-answer
+		end
+	end
+
+	v8 := 255
+	v6 := 0
+	v7 := 0
+	reload-timer
+;
+
+: main
+	new-level
+
+	loop
+		ve := 1
+		loop
+			if ve key begin
+				v4 := ve
+				is-key-previously-held
+				if v6 == 0 begin # if gameplay is on-going
+					if v4 == 0 begin
+						i := patterns
+						v4 := ve
+						v4 -= 1
+						apply-image-to-answer
+						v4 := ve
+						change-pattern-highlight
+						check-winning-condition
+						if v6 == 0 then
+							reduce-timer
+					end
+				end
+
+				v4 := ve
+				handle-keyheld-event
+			end
+			if ve -key begin
+				v4 := ve
+				handle-keyrelease-event
+			end
+			ve += 1
+			v0 := 3
+			if v9 >= 3 then v0 := 5
+			if v9 >= 5 then v0 := 7
+			if v9 >= 10 then v0 := 9
+			if ve <= v0 then
+		again
+		if v6 == 0 begin
+			v0 := delay
+			if v0 == 0 begin
+				reduce-timer
+			end
+		end
+		if v6 == 1 begin
+			# won!
+			v0 := 2
+			buzzer := v0
+			i := wawa
+			va := 21
+			vb := 22
+			sprite va vb 8
+			v0 := 180
+			delay := v0
+			loop
+				v0 := delay
+				if v0 != 0 then
+			again
+			v9 += 1
+			new-level
+		end
+		if v6 == 2 begin
+			# lose
+			v0 := 10
+			buzzer := v0
+			loop
+				v0 := key
+				if v0 != 0x0F then
+			again
+			v9 := 0
+			new-level
+		end
+	again
