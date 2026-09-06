@@ -10,11 +10,19 @@ mi pali e ona tawa tenpo musi "Ludum Dare 59".
 
 ma ni la sina ken musi: [suno pi tomo tawa](https://sadale.net/85/suno-pi-tomo-tawa.html)
 
-### o sama e sitelen!
+### o sama e sitelen! (SITELEN.CH8)
 
 mi pali e ona tawa tenpo musi "pali musi 2026".
 
 ma ni la sina ken musi: [o sama e sitelen!](https://sadalenet.itch.io/o-sama-e-sitelen)
+
+### ilo tenpo (TIMER.CH8)
+
+kepeken ilo ni la sina ken tenpo e ijo.
+
+* nena A la sitelen li kama sike
+* nena C la tenpo li kama 00:00
+* nena F la tenpo li open tawa
 
 # ken
 
