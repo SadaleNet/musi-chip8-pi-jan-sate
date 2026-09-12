@@ -1,0 +1,222 @@
+# SPDX-FileCopyrightText: 2026 Wong Cho Ching <https://sadale.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# Storage modification tool for SuperCHIP saveflags and loadflags
+
+# Usage:
+# 2468: Navigation of cursor
+# C: Clear all storage flags
+# F: Select storage flag, then type in two digits to fill in the value
+
+# Registers allocation
+# v0~2: scratch registers
+# va~vb: sprite position
+# vc: iteration counter register
+# vd: cursor register
+# ve: edit mode state (0 is non-edit mode, 1 is edit mode waiting for first digit, 2 is waiting for second digit)
+
+: print-storage
+	clear
+	if vd != 255 begin
+		i := pos-table-x
+		i += vd
+		load v0
+		va := v0
+		i := pos-table-y
+		i += vd
+		load v0
+		vb := v0
+		i := black-5x7
+		sprite va vb 7
+		va += 5
+		i := black-6x7
+		sprite va vb 7
+	end
+	vc := 0 # counter
+	loop
+		# parse the storage content into v1 (higher digit) and v2 (lower digit)
+		i := storage
+		i += vc
+		load v0
+		v1 := v0
+		v2 := v0
+		# right shift 4 bits
+		v1 >>= v1
+		v1 >>= v1
+		v1 >>= v1
+		v1 >>= v1
+		v0 := 0x0F
+		v2 &= v0
+
+		# load xy positions
+		i := pos-table-x
+		i += vc
+		load v0
+		va := v0
+		va += 1
+		i := pos-table-y
+		i += vc
+		load v0
+		vb := v0
+		vb += 1
+
+		# draw out the content
+		if vc == vd begin
+			if ve == 1 begin
+				jump stop-drawing-digit
+			end
+		end
+		i := hex v1
+		sprite va vb 5
+		if vc == vd begin
+			if ve == 2 begin
+				jump stop-drawing-digit
+			end
+		end
+		va += 5
+		i := hex v2
+		sprite va vb 5
+		: stop-drawing-digit
+
+		vc += 1
+		if vc < 16 then
+	again
+;
+
+: clear-storage
+	vc := 0 # counter
+	loop
+		v0 := 0
+		i := storage
+		i += vc
+		save v0
+
+		vc += 1
+		if vc < 16 then
+	again
+
+	i := storage
+	load vf
+	saveflags vf
+;
+
+: move-cursor
+	if vd == 255 begin
+		vd := 0
+		return
+	end
+	vd += v0
+	if vd >= 16 begin
+		if vd < 20 begin
+			vd := 15
+		else
+			vd := 0
+		end
+	end
+;
+
+: main
+	loadflags vf
+	i := storage
+	save vf
+	vd := 255
+	ve := 0
+
+  loop
+		print-storage
+		v0 := key
+		if ve == 0 begin
+			if v0 == 0x0C begin
+				clear-storage
+			end
+			if v0 == 0x0F begin
+				if vd < 16 begin
+					i := storage
+					i += vd
+					load v0
+					v0 := 0
+					i := storage
+					i += vd
+					save v0
+					ve := 1
+				end
+			end
+			if v0 == 0x02 begin
+				v0 := -4
+				move-cursor
+			end
+			if v0 == 0x04 begin
+				v0 := -1
+				move-cursor
+			end
+			if v0 == 0x06 begin
+				v0 := 1
+				move-cursor
+			end
+			if v0 == 0x08 begin
+				v0 := 4
+				move-cursor
+			end
+			jump endloop
+		end
+		if ve == 1 begin
+			# Type the first digit. First compute the value to be added
+			v1 := v0
+			vc := 0
+			loop
+				v1 <<= v1
+				vc += 1
+				if vc < 4 then
+			again
+
+			# Then add the value
+			i := storage
+			i += vd
+			load v0
+			v0 += v1
+			i := storage
+			i += vd
+			save v0
+
+			# Switch to state of typing the second character
+			ve := 2
+			jump endloop
+		end
+		if ve == 2 begin
+			# Save changes to storage flags
+			v1 := v0
+			i := storage
+			i += vd
+			load v0
+			v0 += v1
+			i := storage
+			i += vd
+			save v0
+
+			# Save changes to storage flags
+			i := register-backup
+			save vf
+			i := storage
+			load vf
+			saveflags vf
+			i := register-backup
+			load vf
+
+			# Back to idle state
+			ve := 0
+
+			jump endloop
+		end
+		: endloop
+  again
+
+
+: storage 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: register-backup 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+: pos-table-x 04 19 34 49 04 19 34 49 04 19 34 49 04 19 34 49
+: pos-table-y 00 00 00 00 08 08 08 08 16 16 16 16 24 24 24 24
+
+: black-5x7 0xF8 0xF8 0xF8 0xF8 0xF8 0xF8 0xF8
+: black-6x7 0xFC 0xFC 0xFC 0xFC 0xFC 0xFC 0xFC

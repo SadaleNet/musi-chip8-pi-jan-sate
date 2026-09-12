@@ -24,6 +24,15 @@ kepeken ilo ni la sina ken tenpo e ijo.
 * nena C la tenpo li kama 00:00
 * nena F la tenpo li open tawa
 
+### ilo pi ante sona "saveflags/loadflags" (STORAGE.CH8)
+
+kepeken ilo ni la sina ken ante e sona "saveflags/loadflags" pi nasin SuperCHIP.
+
+* nena C la sona ali li kama 00
+* nena 2468 la sina ken anu e sona
+* nena F la sina ken ante e sona (sina pini pilin e nena F la o pilin e nena 0-F)
+* kepeken ilo musi 8 la, sina wile awen e sona la, o weka tan musi kepeken nena X. sina weka ala la sona li awen ala a!
+
 # ken
 
 sina ken pali e ali pi wile sina kepeken musi ali ni.
