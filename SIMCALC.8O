@@ -7,7 +7,7 @@
 # Feature:
 # Supports four operations + - * /
 # Supports negative number
-# 11 digits precision (8 digits for division operation)
+# 11 digits precision (9 digits for division operation)
 
 # Usage:
 # 0~9: Numpad
@@ -17,7 +17,6 @@
 
 # Known limitations:
 # * Rapid keypress would cause some key presses wouldn't get registered
-# * Sometimes division rounding isn't working properly. e.g. 3000/500 would yield 5.9999997 instead of 6. I haven't figured out a good way to mitigate it for now.
 # * Division operation is slooooow (takes ~15 second)
 
 # Registers allocation
@@ -711,11 +710,12 @@
 	again
 
 	# result = division-value-1 * (x*NFx10/10)
+	# Intentionally perform multiplication of division-value-1*x first to avoid losing precision
 	copy-value_multiplication-value-1_division-x_22
-	copy-value-div-10 multiplication-value-2 division-nf-times-10 22
+	copy-value multiplication-value-2 division-value-1 22
 	perform-multiplication
-	copy-value multiplication-value-2 multiplication-result 22
-	copy-value multiplication-value-1 division-value-1 22
+	copy-value multiplication-value-1 multiplication-result 22
+	copy-value-div-10 multiplication-value-2 division-nf-times-10 22
 	perform-multiplication
 	copy-value division-result multiplication-result 22
 	i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
@@ -724,8 +724,8 @@
 	
 	# Find the index used for rounding
 	find-nonzero division-result 22
-	v0 += 8
-	if v0 > 19 then v0 := 19 # The max decimal place. Make sure that at minimal 3 digits would get rounded away
+	v0 += 9
+	if v0 > 20 then v0 := 20 # The max decimal place. Make sure that at minimal 2 digits would get rounded away
 
 	v3 := v0 # the index of the digit used for determining the rounding
 	i := division-result i += v3 load v0
