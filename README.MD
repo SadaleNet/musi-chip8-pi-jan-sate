@@ -33,6 +33,15 @@ kepeken ilo ni la sina ken ante e sona "saveflags/loadflags" pi nasin SuperCHIP.
 * nena F la sina ken ante e sona (sina pini pilin e nena F la o pilin e nena 0-F)
 * kepeken ilo musi 8 la, sina wile awen e sona la, o weka tan musi kepeken nena X. sina weka ala la sona li awen ala a!
 
+### ilo nanpa (SIMCALC.CH8)
+
+kepeken ilo ni la sina ken nanpa
+
+* nena 0-9 la sina pana e nanpa
+* nena A la sina pana e sike lili "."
+* nena B la mute li ken. ken la nanpa li kama weka, ken la ilo nanpa li open pali.
+* nena CDEF la sina anu e pali ni: "+-*/"
+
 # ken
 
 sina ken pali e ali pi wile sina kepeken musi ali ni.

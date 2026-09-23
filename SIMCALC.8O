@@ -1,0 +1,1036 @@
+# SPDX-FileCopyrightText: 2026 Wong Cho Ching <https://sadale.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# SIMCALC: Simple pocket calculator
+
+# Feature:
+# Supports four operations + - * /
+# Supports negative number
+# 11 digits precision (9 digits for division operation)
+
+# Usage:
+# 0~9: Numpad
+# A: Decimal point
+# B: negative sign, equal or clear, depending on the state
+# CDEF: plus, minus, multiply and divide
+
+# Known limitations:
+# * Rapid keypress would cause some key presses wouldn't get registered
+# * Division operation is slooooow (takes ~15 second)
+
+# Registers allocation
+# v0~d: scratch registers
+# ve: The state. bit 0 is if there's an operation. but 1..2 is the operation type.
+#     bit 3 is if number's being typed. bit 4 is if decimal point had been pressed. bit 5 is if there's an error
+# vf: scratch registers
+
+: find-value-start-index
+	# va: Find the start position
+	load v0 # the load here skips the sign
+	va := 1
+	load v0 # increment the i and load to v0
+	if v0 == 0 begin
+		loop
+			va += 1
+			load v0 # increment the i and load to v0
+			if v0 == 0 then
+		again
+	end
+	if va > 11 begin # Handle the special case of value less than 1
+		va := 11
+	end
+	return
+
+:macro render-value VALUE_SRC VALUE_X VALUE_Y SHIFT_X BIG_FONT NEG_X NEG_Y DOT_X DOT_Y {
+	v6 := BIG_FONT
+
+	# va: Find the start position
+	i := VALUE_SRC
+	find-value-start-index
+
+	# vb: Find the end index. first iteration skips the sign
+	i := VALUE_SRC load v0 # the load here skips the sign
+	vb := 1
+	load v0 # increment the i and load to v0
+	if v0 != 0xFF begin
+		loop
+			vb += 1
+			load v0 # increment the i and load to v0
+			if v0 != 0xFF then
+		again
+	end
+
+	# v9: Obtain length of the numeric string to be rendered
+	v9 := vb v9 -= va
+	if v9 > 11 begin
+		v9 := 11 # Capped at 11 digits
+		vb := va vb += 11 # Also adjust vb accordingly
+	end
+
+	# Draw the negative sign if required
+	i := VALUE_SRC
+	load v0
+	if v0 != 0 begin
+		vc := NEG_X
+		vd := NEG_Y
+		
+		# Adjust the X position based on the length of the numeric string so that the
+		# negative sign would be next to the first digit
+		v0 := 11
+		v0 -= v9
+		if v0 > 0 begin
+			loop
+				vc += SHIFT_X
+				v0 -= 1
+				if v0 > 0 then
+			again
+		end
+		if v6 > 0 begin i := font-neg-4px
+		else i := font-neg-3px end
+		sprite vc vd 2
+	end
+
+	# Draw the decimal point
+	if vb > 12 begin
+		v8 := 22
+		v8 -= va
+		v8 -= v9
+		vc := DOT_X
+		vd := DOT_Y
+		if v8 > 0 begin
+			loop
+				v8 -= 1
+				vc += SHIFT_X
+				if v8 > 0 then
+			again
+		end
+		i := font-dot
+		if v6 > 0 begin sprite vc vd 2
+		else sprite vc vd 1 end
+	end
+
+	# Draw the numeric string
+	vc := VALUE_X
+	vd := VALUE_Y
+	if v9 < 11 begin
+		v8 := 11
+		loop
+			vc += SHIFT_X
+			v8 -= 1
+			if v8 > v9 then
+		again
+	end
+
+	v8 := va
+	loop
+		i := VALUE_SRC i += v8
+		load v0 # increments i index!
+		if v6 > 0 begin i := bighex v0 sprite vc vd 10
+		else i := hex v0 sprite vc vd 5 end
+		vc += SHIFT_X
+		v8 += 1
+		vf := vb
+		vf -= 1
+		if v8 <= vf then
+	again
+}
+
+: render-operation-value
+	render-value operation-value 54 0 7 0 49 2 59 4
+	return
+
+: render-display-value
+	render-value display-value 10 6 11 1 4 10 19 15
+	if ve >= 0x20 begin
+		vf := 0x0E
+		i := hex vf
+		vc := 5
+		vd := 4
+		sprite vc vd 5
+	end
+	return
+
+: render-long-dash
+	i := long-dash
+	v0 := 0
+	v1 := 18
+	loop
+		sprite v0 v1 1
+		v0 += 8
+		if v0 < 128 then
+	again
+	return
+
+: render-keypad
+	vc := 43 vd := 21
+	# First row
+	vf := 1 i := bighex vf sprite vc vd 10 # 1
+	vc += 11 vf := 2 i := bighex vf sprite vc vd 10 # 2
+	vc += 11 vf := 3 i := bighex vf sprite vc vd 10 # 3
+	vc += 11 i := font-plus sprite vc vd 10 # +
+
+	# Second row
+	vc := 43 vd += 11
+	vf := 4 i := bighex vf sprite vc vd 10 # 4
+	vc += 11 vf := 5 i := bighex vf sprite vc vd 10 # 5
+	vc += 11 vf := 6 i := bighex vf sprite vc vd 10 # 6
+	vc += 11 i := font-minus sprite vc vd 10 # -
+
+	# Third row
+	vc := 43 vd += 11
+	vf := 7 i := bighex vf sprite vc vd 10 # 7
+	vc += 11 vf := 8 i := bighex vf sprite vc vd 10 # 8
+	vc += 11 vf := 9 i := bighex vf sprite vc vd 10 # 9
+	vc += 11 i := font-multiply sprite vc vd 10 # *
+
+	# Fourth row, with variable icon for the third column
+	vc := 43 vd += 11
+	i := font-key-dot sprite vc vd 10 # .
+	vc += 11 vf := 0 i := bighex vf sprite vc vd 10 # 0
+
+	if ve >= 0x20 begin
+		i := font-clear
+	else
+		# va: has operation if >0, 0 else
+		va := ve
+		v0 := 0x01
+		va &= v0
+		# vb: typing number if >0, 0 else
+		vb := ve
+		v0 := 0x08
+		vb &= v0
+		# determine which icon to show 
+		if vb == 0 begin
+			# Not typing number. Show negative sign
+			i := font-negative
+		end
+		if vb > 0 begin
+			if va == 0 then i := font-clear
+			if va > 0 then i := font-equal
+		end
+	end
+	vc += 11 sprite vc vd 10 # = or NEGATIVE or CLEAR depending on the current state
+
+	vc += 11 i := font-divide sprite vc vd 10 # /
+
+	# If an operation had been selected, highlight that operation
+	va := ve
+	vf := 0x07
+	va &= vf
+	if va > 0 begin
+		va >>= va  # va >>= 1
+		i := font-invert
+		vc := 75 vd := 21
+		if va > 0 begin
+			loop
+				va -= 1
+				vd += 11
+				if va > 0 then
+			again
+		end
+		sprite vc vd 0
+	end
+
+	# If decimal point had been pressed, highlight the decimal point
+	va := ve vf := 0x10 va &= vf
+	if va > 0 begin
+		vc := 42 vd := 54
+		i := font-invert
+		sprite vc vd 0
+	end
+	
+	return
+
+: render
+  clear
+	render-operation-value
+	render-display-value
+	render-long-dash
+	render-keypad
+	return
+
+: clear-value
+	# sets the value in i to 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	# optimized for minimizing register usage
+	v1 := 0
+	loop
+		v0 := 0x00
+		if v1 == 12 then v0 := 0xFF
+		v1 += 1
+		save v0
+		if v1 < 23 then
+	again
+	return
+
+: clear-values
+	i := display-value
+	clear-value
+	# Reset typing number flag and decmial point flag
+	vf := 0xEF ve &= vf
+	# Also clear operation-value if there's no pending operation
+	v0 := ve vf := 0x01 v0 &= vf
+	if v0 == 0x00 begin
+		i := operation-value
+		clear-value
+	end
+	return
+
+: find-nonzero-inner
+	v1 := 0
+	loop
+		if v1 == v2 begin
+			v0 := 0xFF
+		else
+			load v0
+		end
+		v1 += 1
+		if v0 == 0x00 then
+	again
+	v1 -= 1
+	v0 := v1
+	return
+:macro find-nonzero A N {
+	i := A v2 := N find-nonzero-inner
+}
+
+:macro rfind-nonzero A N {
+	v1 := N # index register
+	loop
+		v1 -= 1
+		if v1 == 0xFF begin
+			v0 := 0xFF
+			v1 := 0xFE
+		else
+			i := A i += v1
+			load v0
+		end
+		if v0 == 0x00 then
+	again
+	v0 := v1
+	v0 += 1
+}
+
+: zero-value-inner
+	v0 := 0
+	loop
+		save v0
+		v1 -= 1
+		if v1 > 0 then
+	again
+	return
+:macro zero-value A N {
+	v1 := N # index register
+	i := A
+	zero-value-inner
+}
+
+:macro copy-value A B N {
+	:calc NMINUSONE { N - 1 }
+	v1 := NMINUSONE # index register
+	loop
+		i := B i += v1
+		load v0
+		i := A i += v1
+		save v0
+		v1 -= 1
+		if v1 != 0xFF then
+	again
+}
+
+# Purpose of the functions below: Reduce ROM size by turning macro into a function
+: copy-value_multiplication-value-2_division-D_22 copy-value multiplication-value-2 division-D 22 return
+: copy-value_sum-value-2_multiplication-result_22 copy-value sum-value-2 multiplication-result 22 return
+: copy-value_multiplication-value-1_division-x_22 copy-value multiplication-value-1 division-x 22 return
+: copy-value_sum-value-1_operation-value_22 copy-value sum-value-1 operation-value 22 return
+: copy-value_sum-value-2_display-value_22 copy-value sum-value-2 display-value 22 return
+: copy-value_display-value_sum-value-1_22 copy-value display-value sum-value-1 22 return
+
+:macro copy-value-div-10 A B N {
+	:calc NMINUSTWO { N - 2 }
+	v1 := NMINUSTWO # index register
+	v2 := 1
+	loop
+		i := B i += v1
+		load v0
+		i := A i += v1 i += v2
+		save v0
+		v1 -= 1
+		if v1 != 0xFF then
+	again
+	i := A v0 := 0 save v0
+}
+
+:macro copy-value-mul-10 A B N {
+	:calc NMINUSONE { N - 1 }
+	v1 := NMINUSONE # index register
+	v2 := 1
+	i := A i += v1 v0 := 0 save v0
+	loop
+		i := B i += v1
+		load v0
+		i := A i += v1 i -= v2
+		save v0
+		v1 -= 1
+		if v1 != 0 then
+	again
+}
+
+: fill-display-value-eos
+	v1 := 21
+	loop
+		i := display-value i += v1
+		load v0
+		if v0 != 0x00 begin
+			v0 := 0xFF
+			save v0
+			v1 := 0
+		else
+			v1 -= 1
+		end
+		if v1 > 11 then
+	again
+	if v1 == 11 begin
+		v1 := 12
+		i := display-value i += v1
+		v0 := 0xFF
+		save v0
+	end
+	return
+
+: get-rid-of-ff-inner
+	vc := 0
+	loop
+		load v0
+		if v0 == 0xFF then return
+		vc += 1
+		if vc < vd then
+	again
+	return
+
+:macro get-rid-of-ff INDEX N {
+	:calc NMINUSONE { N - 1 }
+	vd := NMINUSONE # index register
+	i := INDEX
+	get-rid-of-ff-inner
+	if vc < vd begin
+		i := INDEX i += vc v0 := 0 save v0
+	end
+}
+: rid-of-ff-for-sum
+	get-rid-of-ff sum-value-1 22
+	get-rid-of-ff sum-value-2 22
+	return
+
+: perform-sum
+	# Performs sum-value-1 += sum-value-2
+	# Converts EOS 0xFF into 0x00
+	rid-of-ff-for-sum
+
+	# Perform summation operation
+	vd := 21 # index register
+	v2 := 0 # carry register
+	loop
+		i := sum-value-2 i += vd
+		load v0
+		v1 := v0 # v1 has sum-value-2[vd]
+		i := sum-value-1 i += vd
+		load v0 # v0 has sum-value-1[vd]
+
+		v0 += v1 # Perform summation
+		v0 += v2 # Add carry value
+
+		# Set carry flag for next value
+		v2 := 0
+		if v0 >= 10 begin
+			v2 := 1
+			v0 -= 10
+		end
+		i := sum-value-1 i += vd
+		save v0
+
+		vd -= 1
+		if vd > 0 then
+	again
+
+	# Overflow. Setting error flag.
+	if v2 != 0 begin
+		vf := 0x20
+		ve |= vf
+	end
+	return
+
+: perform-subtraction
+	# Performs sum-value-1 -= sum-value-2
+	# Both input values must be positive. But the result can be negative
+	rid-of-ff-for-sum
+
+	# If sum-value-1 < sum-value-2, swap the values and make the result negative
+	vd := 1 # index register
+	loop
+		i := sum-value-1 i += vd
+		load v0
+		v1 := v0 # v1 has sum-value-2[vd]
+		i := sum-value-2 i += vd
+		load v0 # v0 has sum-value-1[vd]
+		if v1 == v0 begin
+			vd += 1
+		else
+			if v1 < v0 begin
+				# Detected sum-value-1 is smaller. Swapping value and setting it to negative
+				copy-value subtract-value-tmp sum-value-1 22
+				copy-value sum-value-1 sum-value-2 22
+				copy-value sum-value-2 subtract-value-tmp 22
+				i := sum-value-1
+				v0 := 0x01
+				save v0
+				vd := 22
+			else
+				vd := 22
+			end
+		end
+
+		if vd < 22 then
+	again
+
+	# Perform subtraction operation
+	vd := 21 # index register
+	v2 := 0 # borrow register
+	loop
+		i := sum-value-2 i += vd
+		load v0
+		v1 := v0 # v1 has sum-value-2[vd]
+		i := sum-value-1 i += vd
+		load v0 # v0 has sum-value-1[vd]
+
+		v0 -= v1 # Perform subtraction
+		v0 -= v2 # Minus carry value
+
+		# Set carry flag for next value
+		v2 := 0
+		if v0 >= 128 begin
+			v2 := 1
+			v0 += 10
+		end
+		i := sum-value-1 i += vd
+		save v0
+
+		vd -= 1
+		if vd > 0 then
+	again
+
+	return
+
+: multiply-inner 
+	v0 <<= v0
+	v0 <<= v0
+	v0 <<= v0
+	v0 <<= v0
+	i := multiplication-table
+	i += v0 i += v1
+	load v0
+	return
+
+
+: perform-multiplication
+	# Performs multiplication-result = multiplication-value-1 * multiplication-value-2
+	# Both input values must be positive
+	get-rid-of-ff multiplication-value-1 22
+	get-rid-of-ff multiplication-value-2 22
+
+	# Clear the resultant value. Has to be done because we do optimization and some digits aren't calculated
+	zero-value multiplication-result 32
+
+	# Find the value range to skip computation of digits with zero content
+	find-nonzero multiplication-value-1 22 v4 := v0
+	rfind-nonzero multiplication-value-1 22 v5 := v0
+	find-nonzero multiplication-value-2 22 v6 := v0
+	rfind-nonzero multiplication-value-2 22 v7 := v0
+
+	# If any of the input values is zero, the result gotta be zero. skipping computation!
+	if v5 == 0xFF then return
+	if v7 == 0xFF then return
+
+	# Perform multiplication operation
+	# Each digit sweeps from vd. The value sweeps from vd to v7
+	# In unoptimized implementation, vd is fixed at 31 and v7 is fixed at 0
+
+	# vd := 31 # unoptimized, computation of all digits
+	# optimized: vd := (v5-12)+(v7-12)+11
+	vd := v5
+	vd += v7
+	vd -= 13
+	if vd >= 31 then vd := 31 # Negative value handling
+	
+	# v7 := 0 # unoptimized, computation of all digits
+	# optimized: v7 := (v4-12)+(v6-12)+11
+	v7 := v4
+	v7 += v6
+	v7 -= 13
+	if v7 > 128 then v7 := 0 # Negative value handling
+
+	# Must compute at least one digit
+	if vd <= v7 begin
+		vd := v7
+		vd += 1
+	end
+
+	v8 := 0 # carry register
+	loop
+		v9 := 0 # value of summation of all multiplication values
+		
+		if vd > 11 begin
+			# less significance digits
+			# vb, vc are used for indicating the position of the long multiplication
+			# In this if-block, the range of vc sweeps from 21 -> vd-10, while the range of vb sweeps from 21 -> vc in the same iteration
+			vc := 21
+			# Set va to vd-10
+			va := vd va -= 10
+			loop
+				# vb := va+21-vc
+				vb := va
+				vb += 21
+				vb -= vc
+				i := multiplication-value-1 i += vc load v0 v1 := v0
+				i := multiplication-value-2 i += vb load v0
+				multiply-inner
+				v9 += v0
+				vc -= 1
+				if vc >= va then
+			again
+		else
+			# greater significance digits
+			# vb, vc are used for indicating the position of the long multiplication
+			# In this if-block, the range of vc sweeps from vd+10 -> 0, while the range of vb sweeps from 0 -> vd+10 in the same iteration
+			va := vd va += 10
+			vc := va
+			loop
+				vb := va
+				vb += 1
+				vb -= vc
+				i := multiplication-value-1 i += vc load v0 v1 := v0
+				i := multiplication-value-2 i += vb load v0
+				multiply-inner
+				v9 += v0
+				vc -= 1
+				if vc > 0 then
+			again
+		end
+		v9 += v8
+		i := bcd-buffer
+		bcd v9
+		load v2
+
+		# compute carry digit (need to consider both tens digit and hundreds digit
+		v8 := v1
+		v1 := 10
+		loop
+			v8 += v0
+			v1 -= 1
+			if v1 > 0 then
+		again
+
+		# Write to current digit
+		v0 := v2
+		i := multiplication-result i += vd save v0
+
+		vd -= 1
+		if vd > v7 then
+	again
+	
+	# Overflow. Setting error flag.
+	if v8 != 0 begin
+		: multiplication-overflow
+		vf := 0x20
+		ve |= vf
+	end
+	return
+
+: perform-division
+	get-rid-of-ff division-value-1 22
+	get-rid-of-ff division-value-2 22
+
+	find-nonzero division-value-2 22
+	v2 := v0
+	v3 := 22
+	v3 -= v0
+
+	if v3 == 0 begin
+		zero-value division-result 32
+		vf := 0x20
+		ve |= vf
+		return
+	end
+
+	# Load the normalization factor NFx10
+	zero-value division-nf-times-10 22
+	i := division-value-2
+	i += v2
+	load v0
+	i := nf-table
+	v0 -= 1
+	i += v0
+	load v0
+	i := division-nf-times-10
+	i += v3
+	save v0
+
+	# D = d * NFx10 /10
+	copy-value multiplication-value-1 division-value-2 22
+	copy-value-div-10 multiplication-value-2 division-nf-times-10 22
+	perform-multiplication
+	copy-value division-D multiplication-result 22
+
+	# x0 = 2.8235294117 - 1.8823529411 * D (Remarks: C0 is 2.823... C1 is 1.882...). The end result of x0 is between 1.0~2.0
+	copy-value sum-value-1 division-C0 22
+	copy-value multiplication-value-1 division-C1 22
+	copy-value_multiplication-value-2_division-D_22
+	perform-multiplication
+	copy-value_sum-value-2_multiplication-result_22
+	perform-subtraction
+	copy-value division-x sum-value-1 22
+	i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
+
+	# Perform 3 iterations of x := x*(2-x*D)  [Remarks: C2 is 2.0]
+	v3 := 3
+	loop
+		copy-value sum-value-1 division-C2 22
+		copy-value_multiplication-value-1_division-x_22
+		copy-value_multiplication-value-2_division-D_22
+		perform-multiplication
+		copy-value_sum-value-2_multiplication-result_22
+		perform-subtraction
+		copy-value_multiplication-value-1_division-x_22
+		copy-value multiplication-value-2 sum-value-1 22
+		perform-multiplication
+		copy-value division-x multiplication-result 22
+		i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
+		v3 -= 1
+		if v3 > 0 then
+	again
+
+	# result = division-value-1 * (x*NFx10/10)
+	copy-value_multiplication-value-1_division-x_22
+	copy-value-div-10 multiplication-value-2 division-nf-times-10 22
+	perform-multiplication
+	copy-value multiplication-value-2 multiplication-result 22
+	copy-value multiplication-value-1 division-value-1 22
+	perform-multiplication
+	copy-value division-result multiplication-result 22
+	i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
+	
+	# Perform rounding
+	
+	# Find the index used for rounding
+	find-nonzero division-result 22
+	v0 += 9
+	if v0 > 20 then v0 := 20 # The max decimal place. Make sure that at minimal 2 digits would get rounded away
+
+	v3 := v0 # the index of the digit used for determining the rounding
+	i := division-result i += v3 load v0
+	v2 := v0 # the value of the digit used for determining the rounding
+
+	# zero out all digits after the rounding digits
+	i := division-result i += v3
+	v0 := 0
+	v1 := v3
+	loop
+		save v0
+		v1 += 1
+		if v1 < 22 then
+	again
+
+	# The digit's >= 5. Ronuding up!
+	if v2 >= 5 begin
+		copy-value sum-value-1 division-result 22
+		zero-value sum-value-2 22
+		v3 -= 1 v0 := 1
+		i := sum-value-2 i += v3 save v0
+		perform-sum
+		copy-value division-result sum-value-1 22
+	end
+	
+	return
+
+: execute-operation
+	# Save registers
+	i := register-storage
+	save vd
+
+	v0 := ve
+	vf := 0x07
+	v0 &= vf
+	if v0 != 0x00 begin
+		v0 >>= v0 # v0 >>= 1
+		# v3 holds the operation
+		v3 := v0
+		if v3 <= 0x01 begin # + - operations
+			# Algorithm. A is operation-value, B is display-value. value with n prefix means that the input value's negative:
+			# nA + nB => n(sum(A,B))
+			# A + B => sum(A,B)
+			# nA + B => sub(B,A)
+			# A + nB => sub(A,B)
+			# nA - nB => nA + B => See above
+			# A - B => A + nB => See above
+			# nA - B => nA + nB => See above
+			# A - nB => A + B => See above
+			
+			# v1 is operation-value's sign (A), v2 is display-value's sign (B)
+			# sign of 1 is negative, 0 is positive.
+			i := operation-value load v0
+			v1 := v0
+			i := display-value load v0
+			v2 := v0
+
+			# Flip sign of display-value (B) for minus operation
+			if v3 == 0x01 begin
+				v3 := 0x01 v3 -= v2 v2 := v3 # v2 := 1-v3
+			end
+
+			# Make the sign of both values positive
+			v0 := 0
+			i := operation-value save v0
+			i := display-value save v0
+
+			if v1 == v2 begin
+				i := register-storage-2
+				save v3
+				copy-value_sum-value-1_operation-value_22
+				copy-value_sum-value-2_display-value_22
+				perform-sum
+				copy-value_display-value_sum-value-1_22
+				i := register-storage-2
+				load v3
+				if v1 == 0x01 begin # If both operation-value and display-value were negative, make the result negative
+					i := display-value v0 := 0x01 save v0
+				end
+			else
+				if v1 == 0x01 begin # operation-value (A) is negative, display-value (B) is positive
+					copy-value sum-value-1 display-value 22
+					copy-value sum-value-2 operation-value 22
+				else # operation-value (A) is positive, display-value (B) is negative
+					copy-value_sum-value-1_operation-value_22
+					copy-value_sum-value-2_display-value_22
+				end
+				perform-subtraction
+				copy-value_display-value_sum-value-1_22
+			end
+		else
+			i := icon-hourglass vc := 90 vd := 20 sprite vc vd 13
+			# v1 is operation-value's sign (A), v2 is display-value's sign (B)
+			# sign of 1 is negative, 0 is positive.
+			i := operation-value load v0
+			v1 := v0
+			i := display-value load v0
+			v2 := v0
+			i := register-storage-2
+			save v3
+
+			# Make the sign of both values positive
+			v0 := 0
+			i := operation-value save v0
+			i := display-value save v0
+			
+			if v3 == 0x02 begin
+				copy-value multiplication-value-1 operation-value 22
+				copy-value multiplication-value-2 display-value 22
+				perform-multiplication
+				copy-value display-value multiplication-result 22
+			else
+				copy-value division-value-1 operation-value 22
+				copy-value division-value-2 display-value 22
+				perform-division
+				copy-value display-value division-result 22
+			end
+			i := register-storage-2
+			load v3
+			
+			# If the signedness of two values are different, make the result value negative
+			if v1 != v2 begin
+				i := display-value v0 := 0x01 save v0
+			end
+		end
+		fill-display-value-eos
+	end
+	
+	# operation-value := display-value 
+	copy-value operation-value display-value 23
+
+	# Restore registers
+	i := register-storage
+	load vd
+	return
+
+: main
+# ve: The state. bit 0..2 is operation. bit 3 is if number's being typed. bit 4 is if dot had been pressed. bit 5 is if there's an error
+	ve := 0x00
+	hires
+  loop
+		render
+		if ve >= 0x20 begin
+			loop
+				vd := key
+				if vd != 0x0B then
+			again
+			vf := 0xDF
+			ve &= vf
+		else
+			vd := key
+			render-long-dash # hide dash to indicate that operatoin's on-going
+			if vd <= 9 begin # Handle numpad keys
+				# Clear values if typing number flag's not set
+				v0 := ve vf := 0x08 v0 &= vf
+				if v0 == 0 then clear-values
+
+				# Type the digit
+				v0 := ve
+				vf := 0x10
+				v0 &= vf
+				if v0 == 0 begin # Type a digit before decimal point
+					i := display-value vf := 1 i += vf
+					load va
+					if v0 == 0x00 begin
+						v0 := v1 v1 := v2 v2 := v3 v3 := v4 v4 := v5
+						v5 := v6 v6 := v7 v7 := v8 v8 := v9 v9 := va
+						va := vd
+						i := display-value vf := 1 i += vf
+						save va
+					end
+				else # Type a digit after decimal point
+					# va: start index plus 11. That's the max allowable 0xFF position
+					i := display-value find-value-start-index
+					va += 11
+					# Find the position of 0xFF
+					vc := 11
+					i := display-value vf := 12 i += vf
+					loop
+						load v0
+						vc += 1
+						if v0 != 0xFF then
+					again
+					# If there's still space to type, overwrite 0xFF with the typed decimal digit, then write the 0xFF to the index after that
+					if vc < va begin
+						i := display-value i += vc
+						v0 := vd save v0
+						v0 := 0xFF save v0
+					end
+				end
+
+				# Set typing number flag
+				vf := 0x08 ve |= vf
+			end
+			if vd == 0x0A begin # decimal point
+				# Clear values if typing number flag's not set
+				v0 := ve vf := 0x08 v0 &= vf
+				if v0 == 0 then clear-values
+
+				# Set decimal point flag and typing number flag
+				vf := 0x18 ve |= vf
+			end
+			if vd == 0x0B begin # multiplex'd button (equal, negative and clear)
+				v0 := ve vf := 0x08 v0 &= vf
+				if v0 == 0 begin # if typing number flag's reset, set display value to negative zero, reset decimal point flag and set typing flag
+					# clear display-value to zero
+					i := display-value
+					clear-value
+					# make value negative
+					i := display-value
+					v0 := 0x01
+					save v0
+					# Reset decimal point flag
+					vf := 0xEF ve &= vf
+					# set typing flag
+					vf := 0x08 ve |= vf
+				else
+					v0 := ve vf := 0x01 v0 &= vf
+					if v0 != 0x00 begin # If there's a pending operation, execute it and clear the operation
+						execute-operation
+						vf := 0xE8 ve &= vf # clear operation flags and decimal point flag
+					else # If there's no pending operation, clear values
+						clear-values
+					end
+					# reset typing flag
+					vf := 0xF7 ve &= vf
+				end
+			end
+			if vd >= 0x0C begin # Operation buttons +-*/
+				# Execute operation if typing number flag's set
+				v0 := ve vf := 0x08 v0 &= vf
+				if v0 != 0 then execute-operation
+				# Set operation flag
+				vf := 0x01 ve |= vf
+				# Reset operation type flags
+				vf := 0xF9 ve &= vf
+				# Set operation type flags: ve |= (vd-0x0C) << 1
+				v0 := vd v0 -= 0x0C v0 <<= v0 ve |= v0
+				# Reset typing number flag and decmial point flag
+				vf := 0xE7 ve &= vf
+			end
+		end
+  again
+
+
+# Encoding: polarity + 11 digits + 10 decimal digits + EOS indicator for each value. EOS indicator is 0xFF
+# For example, -123.45 would be 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x02 0x03 0x04 0x05 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+#: display-value 0x00 0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09 0x00 0x01 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+#: display-value 0x01 0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09 0x00 0x01 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+# : display-value 0x01 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09 0x01 0xFF # 1.1234567891
+# : display-value 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x02 0x03 0x04 0x05 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 # 123.45
+: display-value 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: operation-value 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+# Encoding: polarity + 11 digits + 10 decimal digits. 0xFF would be read as zero
+: sum-value-1 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: sum-value-2 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: subtract-value-tmp 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+: multiplication-value-1 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: multiplication-value-2 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+# Format: sign x1, digits x11, decimal digits x20
+: multiplication-result 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+: division-value-1 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: division-value-2 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: division-result 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: division-nf-times-10 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: division-D 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: division-x 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: division-C0 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x08 0x02 0x03 0x05 0x02 0x09 0x04 0x01 0x01 0x07  # 2.8235294117
+: division-C1 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x08 0x08 0x02 0x03 0x05 0x02 0x09 0x04 0x01 0x01  # 1.8823529411
+: division-C2 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00  # 2.0
+
+: bcd-buffer 0x00 0x00 0x00
+
+: font-dot 0x80 0x80
+: font-neg-4px 0xF0 0xF0
+: font-neg-3px 0xE0 0x00
+: long-dash 0xFF
+
+# print('\n'.join([' '.join([str(i*j) if j < 10 else '0' for j in range(16)]) for i in range(10)]))
+: multiplication-table
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 1 2 3 4 5 6 7 8 9 0 0 0 0 0 0
+0 2 4 6 8 10 12 14 16 18 0 0 0 0 0 0
+0 3 6 9 12 15 18 21 24 27 0 0 0 0 0 0
+0 4 8 12 16 20 24 28 32 36 0 0 0 0 0 0
+0 5 10 15 20 25 30 35 40 45 0 0 0 0 0 0
+0 6 12 18 24 30 36 42 48 54 0 0 0 0 0 0
+0 7 14 21 28 35 42 49 56 63 0 0 0 0 0 0
+0 8 16 24 32 40 48 56 64 72 0 0 0 0 0 0
+0 9 18 27 36 45 54 63 72 81 0 0 0 0 0 0
+
+: nf-table 5 3 2 2 1 1 1 1 1
+
+: font-plus 0x00 0x18 0x18 0x18 0xFF 0xFF 0x18 0x18 0x18 0x00
+: font-minus 0x00 0x00 0x00 0x00 0xFF 0xFF 0x00 0x00 0x00 0x00
+: font-multiply 0x00 0xC3 0xE7 0x7E 0x3C 0x3C 0x7E 0xE7 0xC3 0x00
+: font-divide 0x00 0x18 0x18 0x00 0xFF 0xFF 0x00 0x18 0x18 0x00
+: font-key-dot 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x18 0x18 0x00
+: font-equal 0x00 0x00 0xFF 0xFF 0x00 0x00 0xFF 0xFF 0x00 0x00
+: font-negative 0x3C 0x42 0x81 0x81 0xBD 0xBD 0x81 0x81 0x42 0x3C
+: font-clear 0x7E 0x81 0xA5 0xA5 0x99 0x99 0xA5 0xA5 0x81 0x7E
+: font-invert 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: icon-hourglass 0xFE 0xFE 0x82 0x82 0x7C 0x38 0x10 0x28 0x44 0x82 0xC6 0xFE 0xFE
+
+: register-storage 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+: register-storage-2 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
