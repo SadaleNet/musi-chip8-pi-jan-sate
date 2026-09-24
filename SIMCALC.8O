@@ -17,7 +17,8 @@
 
 # Known limitations:
 # * Rapid keypress would cause some key presses wouldn't get registered
-# * Division operation is slooooow (takes ~15 second)
+# * Division operation is slooooow (takes ~15 second at 100 instructions/cycle)
+# * Division of larger value isn't working properly (e.g. 90000000000/1.1 would yield error. 5000000000/1.1 would yield 4545454550)
 
 # Registers allocation
 # v0~d: scratch registers
@@ -422,6 +423,14 @@
 	get-rid-of-ff sum-value-2 22
 	return
 
+: load-sum-values-of-index-vd-to-v0-and-v1
+	i := sum-value-2 i += vd
+	load v0
+	v1 := v0 # v1 has sum-value-2[vd]
+	i := sum-value-1 i += vd
+	load v0 # v0 has sum-value-1[vd]
+	return
+
 : perform-sum
 	# Performs sum-value-1 += sum-value-2
 	# Converts EOS 0xFF into 0x00
@@ -431,11 +440,7 @@
 	vd := 21 # index register
 	v2 := 0 # carry register
 	loop
-		i := sum-value-2 i += vd
-		load v0
-		v1 := v0 # v1 has sum-value-2[vd]
-		i := sum-value-1 i += vd
-		load v0 # v0 has sum-value-1[vd]
+		load-sum-values-of-index-vd-to-v0-and-v1
 
 		v0 += v1 # Perform summation
 		v0 += v2 # Add carry value
@@ -468,15 +473,12 @@
 	# If sum-value-1 < sum-value-2, swap the values and make the result negative
 	vd := 1 # index register
 	loop
-		i := sum-value-1 i += vd
-		load v0
-		v1 := v0 # v1 has sum-value-2[vd]
-		i := sum-value-2 i += vd
-		load v0 # v0 has sum-value-1[vd]
-		if v1 == v0 begin
+		load-sum-values-of-index-vd-to-v0-and-v1
+
+		if v0 == v1 begin
 			vd += 1
 		else
-			if v1 < v0 begin
+			if v0 < v1 begin
 				# Detected sum-value-1 is smaller. Swapping value and setting it to negative
 				copy-value subtract-value-tmp sum-value-1 22
 				copy-value sum-value-1 sum-value-2 22
@@ -497,11 +499,7 @@
 	vd := 21 # index register
 	v2 := 0 # borrow register
 	loop
-		i := sum-value-2 i += vd
-		load v0
-		v1 := v0 # v1 has sum-value-2[vd]
-		i := sum-value-1 i += vd
-		load v0 # v0 has sum-value-1[vd]
+		load-sum-values-of-index-vd-to-v0-and-v1
 
 		v0 -= v1 # Perform subtraction
 		v0 -= v2 # Minus carry value
@@ -562,21 +560,22 @@
 	vd -= 13
 	if vd >= 31 then vd := 31 # Negative value handling
 	
-	# v7 := 0 # unoptimized, computation of all digits
-	# optimized: v7 := (v4-12)+(v6-12)+11
-	v7 := v4
-	v7 += v6
-	v7 -= 13
-	if v7 > 128 then v7 := 0 # Negative value handling
+	# v4 := 0 # unoptimized, computation of all digits
+	# optimized: v4 := (v4-12)+(v6-12)+11
+	v4 += v6
+	v4 -= 13
+	if v4 > 128 then v4 := 0 # Negative value handling
 
 	# Must compute at least one digit
-	if vd <= v7 begin
-		vd := v7
+	if vd <= v4 begin
+		vd := v4
 		vd += 1
 	end
 
-	v8 := 0 # carry register
+	v8 := 0 # carry register (base 10)
 	loop
+		# The max possible value of summation is 1898 (9*9*21+189)
+		v7 := 0 # summation overflow counter (base 256)
 		v9 := 0 # value of summation of all multiplication values
 		
 		if vd > 11 begin
@@ -595,6 +594,7 @@
 				i := multiplication-value-2 i += vb load v0
 				multiply-inner
 				v9 += v0
+				if vf == 1 then v7 += 1 # overflow handling
 				vc -= 1
 				if vc >= va then
 			again
@@ -612,30 +612,48 @@
 				i := multiplication-value-2 i += vb load v0
 				multiply-inner
 				v9 += v0
+				if vf == 1 then v7 += 1 # overflow handling
 				vc -= 1
 				if vc > 0 then
 			again
 		end
 		v9 += v8
+		if vf == 1 then v7 += 1 # overflow handling
 		i := bcd-buffer
 		bcd v9
 		load v2
 
 		# compute carry digit (need to consider both tens digit and hundreds digit
 		v8 := v1
-		v1 := 10
-		loop
-			v8 += v0
-			v1 -= 1
-			if v1 > 0 then
-		again
+		if v0 > 0 begin
+			loop
+				v8 += 10
+				v0 -= 1
+				if v0 > 0 then
+			again
+		end
+
+		if v7 > 0 begin
+			# For each v7, its value is 256 so we need
+			# to add 25 to v8 and 6 to v2
+			loop
+				v8 += 25
+				v2 += 6
+				if v2 >= 10 begin
+					v8 += 1
+					v2 -= 10
+				end
+				v7 -= 1
+				if v7 > 0 then
+			again
+		end
 
 		# Write to current digit
 		v0 := v2
 		i := multiplication-result i += vd save v0
 
 		vd -= 1
-		if vd > v7 then
+		if vd > v4 then
 	again
 	
 	# Overflow. Setting error flag.
@@ -644,6 +662,10 @@
 		vf := 0x20
 		ve |= vf
 	end
+	return
+
+: show-division-progress
+	i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
 	return
 
 : perform-division
@@ -689,7 +711,7 @@
 	copy-value_sum-value-2_multiplication-result_22
 	perform-subtraction
 	copy-value division-x sum-value-1 22
-	i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
+	show-division-progress
 
 	# Perform 3 iterations of x := x*(2-x*D)  [Remarks: C2 is 2.0]
 	v3 := 3
@@ -704,7 +726,7 @@
 		copy-value multiplication-value-2 sum-value-1 22
 		perform-multiplication
 		copy-value division-x multiplication-result 22
-		i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
+		show-division-progress
 		v3 -= 1
 		if v3 > 0 then
 	again
@@ -718,7 +740,7 @@
 	copy-value-div-10 multiplication-value-2 division-nf-times-10 22
 	perform-multiplication
 	copy-value division-result multiplication-result 22
-	i := icon-hourglass vc := 100 vd := 20 sprite vc vd 13
+	show-division-progress
 	
 	# Perform rounding
 	
