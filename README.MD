@@ -4,44 +4,17 @@ ma ni li jo e musi CHIP-8 pi jan Sate.
 
 mi pali e musi CHIP-8 tan ni: mi pali e ilo musi pi nasin CHIP-8. mi wile e musi pi toki pona tawa ilo musi mi.
 
-ken: CC0-1.0
+### lipu nimi (LIPUNIMI.CH8)
 
-### suno pi tomo tawa
+[https://johnearnest.github.io/Octo/index.html?key=jx5oYAtz](![o musi!](LIPUNIMI.PNG))
 
-mi pali e ona tawa tenpo musi "Ludum Dare 59".
+lipu pi nimi ali pi toki pona. ona li tan [lipu Wikipesija pi nimi pi toki pona](https://tok.wikipedia.org/wiki/kulupu:nimi).
 
-ma ni la sina ken musi: [suno pi tomo tawa](https://sadale.net/85/suno-pi-tomo-tawa.html)
-
-### o sama e sitelen! (SITELEN.CH8)
-
-mi pali e ona tawa tenpo musi "pali musi 2026".
-
-ma ni la sina ken musi: [o sama e sitelen!](https://sadalenet.itch.io/o-sama-e-sitelen)
-
-ken: CC0-1.0
-
-### ilo tenpo (TIMER.CH8)
-
-kepeken ilo ni la sina ken tenpo e ijo.
-
-* nena A la sitelen li kama sike
-* nena C la tenpo li kama 00:00
-* nena F la tenpo li open tawa
-
-ken: CC0-1.0
-
-### ilo pi ante sona "saveflags/loadflags" (STORAGE.CH8)
-
-kepeken ilo ni la sina ken ante e sona "saveflags/loadflags" pi nasin SuperCHIP.
-
-* nena C la sona ali li kama 00
-* nena 2468 la sina ken anu e sona
-* nena F la sina ken ante e sona (sina pini pilin e nena F la o pilin e nena 0-F)
-* kepeken ilo musi 8 la, sina wile awen e sona la, o weka tan musi kepeken nena X. sina weka ala la sona li awen ala a!
-
-ken: CC0-1.0
+ken: CC-BY-SA-4.0
 
 ### ilo nanpa (SIMCALC.CH8)
+
+[https://johnearnest.github.io/Octo/index.html?key=c64FvpNG](![o musi!](SIMCALC.PNG))
 
 kepeken ilo ni la sina ken nanpa
 
@@ -52,7 +25,54 @@ kepeken ilo ni la sina ken nanpa
 
 ken: CC0-1.0
 
+### o sama e sitelen! (SITELEN.CH8)
+
+[https://johnearnest.github.io/Octo/index.html?key=wbsuVqJi](![o musi!](SITELEN.PNG))
+
+mi pali e ona tawa tenpo musi "pali musi 2026".
+
+musi ni li lon ma ni kin: [o sama e sitelen!](https://sadalenet.itch.io/o-sama-e-sitelen)
+
+ken: CC0-1.0
+
+### ilo pi ante sona "saveflags/loadflags" (STORAGE.CH8)
+
+[https://johnearnest.github.io/Octo/index.html?key=dCdA6tDR](![o musi!](STORAGE.PNG))
+
+kepeken ilo ni la sina ken ante e sona "saveflags/loadflags" pi nasin SuperCHIP.
+
+* nena C la sona ali li kama 00
+* nena 2468 la sina ken anu e sona
+* nena F la sina ken ante e sona (sina pini pilin e nena F la o pilin e nena 0-F)
+* kepeken ilo musi 8 la, sina wile awen e sona la, o weka tan musi kepeken nena X. sina weka ala la sona li awen ala a!
+
+ken: CC0-1.0
+
+### suno pi tomo tawa (SUNOTOMO.CH8)
+
+[https://sadale.net/85/suno-pi-tomo-tawa.html](![o musi!](SUNOTOMO.PNG))
+
+mi pali e ona tawa tenpo musi "Ludum Dare 59".
+
+musi ni li lon ma ni kin: [suno pi tomo tawa](https://sadale.net/85/suno-pi-tomo-tawa.html)
+
+ken: CC0-1.0
+
+### ilo tenpo (TIMER.CH8)
+
+[https://johnearnest.github.io/Octo/index.html?key=7GeH2Zf2](![o musi!](TIMER.PNG))
+
+kepeken ilo ni la sina ken tenpo e ijo.
+
+* nena A la sitelen li kama sike
+* nena C la tenpo li kama 00:00
+* nena F la tenpo li open tawa
+
+ken: CC0-1.0
+
 ## Tokdle (TOKDLE.CH8)
+
+[https://johnearnest.github.io/Octo/index.html?key=CIui3vfu](![o musi!](TOKDLE.PNG))
 
 musi Wordle pi toki pona.
 
@@ -61,12 +81,6 @@ musi Wordle pi toki pona.
 * nena F la sina pana e nimi sina li kama sona e ni: nimi sina li pona ala pona?
 
 ken: CC0-1.0
-
-### lipu nimi (LIPUNIMI.CH8)
-
-lipu pi nimi ali pi toki pona. ona li tan [lipu Wikipesija pi nimi pi toki pona](https://tok.wikipedia.org/wiki/kulupu:nimi).
-
-ken: CC-BY-SA-4.0
 
 # ken
 
