@@ -1,0 +1,382 @@
+# SPDX-FileCopyrightText: 2026 Wong Cho Ching <https://sadale.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# TOKDLE: Toki Pona Wordle game
+
+# Type in a four letter toki pona word and press Enter.
+# If the letter is rendered inverted, it's correct. If it's rendered with a border, the letter exists but with wrong position.
+# You can try up to 4 times and if you still don't get it, the answer would be revealed
+
+# Usage:
+# 0123456798ACDE: Type a letter
+# B: Backspace / Restart game
+# F: Enter
+
+# Registers allocation
+# v0~c: scratch registers
+# vd: x-index. The character being typed. Valid value is normally 0~4 [at 4 the user can't type anything]. If x == 5, it means that the user had won
+# ve: y-index. The number of attempts of answering the question. Valid value is normally 0~3. If y == 4, it's game over
+# vf: scratch register
+
+:const wordcount 66
+:const letter-x 17
+:const letter-y 2
+:const underline-y 13
+:const answer-y 54
+:const letter-pitch-x 12
+:const letter-pitch-y 13
+:const correct-x 15
+:const correct-y 0
+
+: render-keypad
+	i := inversion
+	v1 := 78
+	v2 := 0
+	loop
+		sprite v1 v2 0
+		v1 += 10
+		if v1 >= 128 begin
+			v1 := 78
+			v2 += 16
+		end
+		if v2 < 64 then
+	again
+
+	i := font
+	v0 := 9
+	v1 := 83
+	v2 := 6
+	loop
+		sprite v1 v2 9
+		i += v0
+		v1 += 11
+		if v1 > 117 begin
+			v1 := 83
+			v2 += 14
+		end
+		if v2 <= 48 then
+	again
+	return
+
+: render-underlines
+	v1 := letter-x
+	v2 := underline-y
+	v0 := ve
+	i := font-underline
+	if v0 > 0 begin
+		loop
+			v2 += letter-pitch-y
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+
+	loop
+		sprite v1 v2 1
+		v1 += letter-pitch-x
+		if v1 < 62 then
+	again
+	
+	return
+
+: render-letter
+	v1 := letter-x
+	v2 := letter-y
+	v3 := 0
+	v0 := vd
+	if v0 > 0 begin
+		loop
+			v1 += letter-pitch-x
+			v3 += 1
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+	v0 := ve
+	if v0 > 0 begin
+		loop
+			v2 += letter-pitch-y
+			v3 += 4
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+	i := user-input i += v3 load v0
+	v3 := 0
+	if v0 > 0 begin
+		loop
+			v3 += 9
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+	i := font i += v3 sprite v1 v2 9
+	return
+
+:macro handle-all-correct A B {
+	if A == B begin
+		i := all-correct
+		sprite v1 v2 0
+		i := letter-counter i += A load v0
+		v0 -= 1
+		i := letter-counter i += A save v0
+		vc += 1
+	end
+}
+
+:macro handle-half-correct A B {
+	if A != B begin
+		i := letter-counter i += B load v0
+		if v0 > 0 begin
+			i := half-correct
+			sprite v1 v2 0
+			v0 -= 1
+			i := letter-counter i += B save v0
+		end
+	end
+}
+
+: check-and-render-result
+	i := answer load v3
+	v4 := v0
+	v5 := v1
+	v6 := v2
+	v7 := v3
+	i := user-input i += ve i += ve i += ve i += ve load v3
+	v8 := v0
+	v9 := v1
+	va := v2
+	vb := v3
+	
+	v2 := correct-y
+	v0 := ve
+	if v0 > 0 begin
+		loop
+			v2 += letter-pitch-y
+			v3 += 4
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+
+	# Store the number of letters available to letter-counter
+	v1 := 0
+	i := letter-counter
+	loop
+		v0 := 0
+		if v4 == v1 then v0 += 1
+		if v5 == v1 then v0 += 1
+		if v6 == v1 then v0 += 1
+		if v7 == v1 then v0 += 1
+		save v0
+		v1 += 1
+		if v1 < 14 then
+	again
+
+	# Show all correct tiles. Also count the number of all corrects.
+	vc := 0
+	v1 := correct-x
+	handle-all-correct v4 v8
+	v1 += letter-pitch-x
+	handle-all-correct v5 v9
+	v1 += letter-pitch-x
+	handle-all-correct v6 va
+	v1 += letter-pitch-x
+	handle-all-correct v7 vb
+	
+	if vc == 4 begin
+		vd := 5 # All correct! The game's been won. Let's mark it as so!
+		return
+	end
+
+	# Show half correct tiles
+	v1 := correct-x
+	handle-half-correct v4 v8
+	v1 += letter-pitch-x
+	handle-half-correct v5 v9
+	v1 += letter-pitch-x
+	handle-half-correct v6 va
+	v1 += letter-pitch-x
+	handle-half-correct v7 vb
+	return
+
+: render-answer
+	v1 := letter-x
+	v2 := answer-y
+
+	v3 := 0
+	loop
+		i := answer i += v3 load v0
+		i := font i += v0 i += v0 i += v0 i += v0 i += v0 i += v0 i += v0 i += v0 i += v0 sprite v1 v2 9
+		v1 += letter-pitch-x
+		v3 += 1
+		if v3 < 4 then
+	again
+	
+	return
+
+: main
+	v0 := 0
+	loop
+		v0 := random 0x7F
+		if v0 >= wordcount then
+	again
+
+	v1 := 4
+	i := wordlist
+	if v0 > 0 begin
+		loop
+			i += v1
+			v0 -= 1
+			if v0 > 0 then
+		again
+	end
+
+	load v3
+	i := answer
+	save v3
+
+	hires
+	vd := 0
+	ve := 0
+	clear
+	render-keypad
+	render-underlines
+	loop
+		v0 := key i := keymapping i += v0 load v0
+		if v0 <= 13 begin
+			if ve < 4 begin
+				if vd <= 3 begin
+					i := user-input i += ve i += ve i += ve i += ve i += vd save v0
+					render-letter
+					vd += 1
+				end
+			end
+		else
+			if v0 == 14 begin
+				if vd == 5 then jump main # replay game
+				if ve == 4 then jump main # replay game
+				if vd > 0 begin
+					vd -= 1
+					render-letter
+					v0 := 0xFF
+					i := user-input i += ve i += ve i += ve i += ve i += vd save v0
+				end
+			else # v0 == 15
+				if vd == 4 begin
+					if ve < 4 begin
+						render-underlines
+						check-and-render-result
+						if vd != 5 begin
+							ve += 1
+							vd := 0
+							if ve < 4 begin render-underlines else render-answer end
+						end
+					end
+				end
+			end
+		end
+	again
+
+: answer 0xFF 0xFF 0xFF 0xFF
+: letter-counter 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+: user-input  0xFF 0xFF 0xFF 0xFF
+							0xFF 0xFF 0xFF 0xFF
+							0xFF 0xFF 0xFF 0xFF
+							0xFF 0xFF 0xFF 0xFF
+
+: inversion 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0 0xFF 0xC0
+
+: keymapping 13 0 1 2 4 5 6 8 9 10 12 14 3 7 11 15
+
+: half-correct 0xFF 0xE0 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0x80 0x20 0xFF 0xE0 0x00 0x00 0x00 0x00 0x00 0x00
+: all-correct 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0xFF 0xE0 0x00 0x00 0x00 0x00 0x00 0x00
+
+: font  0x10 0x28 0x44 0x82 0x82 0xFE 0x82 0x82 0x82 # A
+				0xFE 0x80 0x80 0x80 0xFC 0x80 0x80 0x80 0xFE # E
+				0xFE 0x10 0x10 0x10 0x10 0x10 0x10 0x10 0xFE # I
+				0x3E 0x08 0x08 0x08 0x08 0x88 0x88 0x88 0x70 # J
+				0x82 0x84 0x88 0x90 0xA0 0xD0 0x88 0x84 0x82 # K
+				0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0xFE # L
+				0x82 0xC6 0xAA 0x92 0x92 0x82 0x82 0x82 0x82 # M
+				0x82 0xC2 0xA2 0xA2 0x92 0x8A 0x8A 0x86 0x82 # N
+				0x38 0x44 0x82 0x82 0x82 0x82 0x82 0x44 0x38 # O
+				0xFC 0x82 0x82 0x82 0xFC 0x80 0x80 0x80 0x80 # P
+				0x7C 0x82 0x80 0x80 0x7C 0x02 0x02 0x82 0x7C # S
+				0xFE 0x10 0x10 0x10 0x10 0x10 0x10 0x10 0x10 # T
+				0x82 0x82 0x82 0x82 0x82 0x82 0x82 0x44 0x38 # U
+				0x82 0x82 0x82 0x82 0x92 0x92 0xAA 0xC6 0x82 # W
+				0xFE 0x82 0xAA 0xAA 0x92 0xAA 0xAA 0x82 0xFE # Backspace
+				0x00 0x04 0x04 0x24 0x44 0xFC 0x40 0x20 0x00 # Enter
+
+: font-underline 0xFE
+
+: wordlist
+	0 7 9 0 # anpa
+	0 7 11 1 # ante
+	0 13 1 7 # awen
+	1 10 12 7 # esun
+	2 7 10 0 # insa
+	3 0 4 2 # jaki
+	3 1 5 8 # jelo
+	4 0 5 0 # kala
+	4 0 6 0 # kama
+	4 0 10 2 # kasi
+	4 2 5 2 # kili
+	4 12 5 1 # kule
+	4 12 11 1 # kute
+	5 0 9 1 # lape
+	5 0 10 8 # laso
+	5 0 13 0 # lawa
+	5 1 11 1 # lete
+	5 2 5 2 # lili
+	5 2 9 12 # lipu
+	5 8 3 1 # loje
+	5 12 4 0 # luka
+	5 12 9 0 # lupa
+	6 0 6 0 # mama
+	6 0 7 2 # mani
+	6 1 5 2 # meli
+	6 2 3 1 # mije
+	6 8 4 12 # moku
+	6 8 5 2 # moli
+	6 12 10 2 # musi
+	6 12 11 1 # mute
+	7 0 10 0 # nasa
+	7 1 7 0 # nena
+	7 2 6 2 # nimi
+	7 8 4 0 # noka
+	8 5 2 7 # olin
+	8 9 1 7 # open
+	9 0 5 2 # pali
+	9 0 7 0 # pana
+	9 2 7 2 # pini
+	9 2 9 2 # pipi
+	9 8 4 0 # poka
+	9 8 4 2 # poki
+	9 8 7 0 # pona
+	10 0 6 0 # sama
+	10 1 5 2 # seli
+	10 1 5 8 # selo
+	10 1 6 1 # seme
+	10 1 13 2 # sewi
+	10 2 4 1 # sike
+	10 2 7 0 # sina
+	10 8 7 0 # sona
+	10 12 5 2 # suli
+	10 12 7 8 # suno
+	10 12 9 0 # supa
+	10 12 13 2 # suwi
+	11 0 10 8 # taso
+	11 0 13 0 # tawa
+	11 1 5 8 # telo
+	11 8 4 2 # toki
+	11 8 6 8 # tomo
+	12 7 9 0 # unpa
+	13 0 5 8 # walo
+	13 0 10 8 # waso
+	13 0 13 0 # wawa
+	13 1 4 0 # weka
+	13 2 5 1 # wile
