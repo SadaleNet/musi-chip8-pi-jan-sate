@@ -60,11 +60,19 @@ musi Wordle pi toki pona.
 * nena B la sina weka e nimi
 * nena F la sina pana e nimi sina li kama sona e ni: nimi sina li pona ala pona?
 
+ken: CC0-1.0
+
+### lipu nimi (LIPUNIMI.CH8)
+
+lipu pi nimi ali pi toki pona. ona li tan [lipu Wikipesija pi nimi pi toki pona](https://tok.wikipedia.org/wiki/kulupu:nimi).
+
+ken: CC-BY-SA-4.0
+
 # ken
 
-sina ken pali e ali pi wile sina kepeken musi ali ni.
+musi ali li jo e ken ante. o lukin e ona insa lipu .CH8.
 
-taso sina pali e ijo ike la ike o tawa sina o tawa mi ala! :P
+sina pali e ijo ike la ike o tawa sina o tawa mi ala a! :P
 
 # License
 

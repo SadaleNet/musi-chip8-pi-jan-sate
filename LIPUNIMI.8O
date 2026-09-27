@@ -1,0 +1,498 @@
+# SPDX-FileCopyrightText: 2026 Wong Cho Ching <https://sadale.net>
+#
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# LIPUNIMI: Toki Pona Dictionary
+# Based on https://tok.wikipedia.org/wiki/kulupu:nimi
+# Quite a few of definitions had been manually simplified for saving ROM space.
+
+# Usage:
+# B: view the previous entry
+# F: view the next entry
+# Other keys: seek to the index as shown on the title screen
+
+# Registers allocation
+# v0~9: scratch registers
+# va~ve: function parameters
+# vf: scratch register
+
+: seek-index-based-on-va
+	if va > 0 begin
+		loop
+			load v0
+			i += v0
+			va -= 1
+			if va > 0 then
+		again
+	end
+	return
+
+: render-word-buffer # parameter: vb, vc are word x and y positions
+	i := word-buffer load v0
+	v1 := v0 # length of the word goes here
+	v2 := 1 # index of word-buffer
+
+	loop
+		i := word-buffer i += v2
+		load v0
+		i := font i += v0 i += v0 i += v0 i += v0 i += v0 # i += v0*5
+		sprite vb vc 5
+		vb += 6
+		v2 += 1
+		if v2 <= v1 then
+	again
+	vb += 6
+	return
+
+: render-word # paramter: va is the word ID. vb, vc are word x and y positions. Wordwrap is performed automatically
+	i := register-storage save vf
+	# Load the word into word buffer
+	i := wordlist
+	seek-index-based-on-va
+	load vf
+	i := word-buffer save vf
+	i := register-storage load vf
+
+	# For punctuations, remove the previous trailing space
+	if va >= 137 then vb -= 6
+
+	# word wrap handling
+	i := word-buffer load v0
+	v1 := vb v1 += v0 v1 += v0 v1 += v0 v1 += v0 v1 += v0 v1 += v0 # v1 := vb+v0*6
+	if v1 >= 128 begin
+		vb := 0
+		vc += 6
+	end
+	render-word-buffer
+	return
+
+: render-definition # paramter: va is the sentence ID
+	i := register-storage save vf
+	v0 := va i := register-storage-2 save v0
+	vb := 0 vc := 0 render-word
+	# Load the definition into the definition buffer
+	i := definitions
+	seek-index-based-on-va
+	load vf
+	i := definition-buffer save vf
+
+	i := register-storage-2 load v0 va := v0
+	i := definitions
+	seek-index-based-on-va
+	vf := 16
+	i += vf load ve
+	i := definition-buffer i += vf save ve
+
+	i := register-storage load vf
+
+	i := definition-buffer load v0
+	vd := 1 # iteration register
+	ve := v0 # iteration limit register
+
+	vb := 0
+	vc := 10
+	loop
+		i := definition-buffer i += vd load v0
+		va := v0
+		render-word
+		vd += 1
+		if vd <= ve then
+	again
+	i := register-storage-2 load v0
+	va := v0
+	return
+
+: render-usage # paramter: vd is the highlighted font
+	v0 := 0
+	vb := 48
+	vc := 13
+
+	loop
+		i := font
+		i += v0
+		v0 += 5
+		sprite vb vc 5
+		if vd == 0 begin
+			i := font-highlighted
+			v1 := vb v2 := vc
+			v1 -= 1 v2 -= 1
+			sprite v1 v2 7
+		end
+		vd -= 1
+		vb += 10
+		if vb >= 88 begin
+			vb := 48
+			vc += 10
+		end
+		if vc < 53 then
+	again
+	return
+
+: main
+	hires clear
+	vd := 0xFF
+	render-usage
+	va := 0xF0
+	loop
+		v0 := key
+		if v0 == 0x01 then va := 0 # a
+		if v0 == 0x02 then va := 9 # e
+		if v0 == 0x03 then va := 13 # i
+		if v0 == 0x0C then va := 17 # j
+		if v0 == 0x04 then va := 22 # k
+		if v0 == 0x05 then va := 40 # l
+		if v0 == 0x06 then va := 57 # m
+		if v0 == 0x0D then va := 73 # n
+		if v0 == 0x07 then va := 82 # o
+		if v0 == 0x08 then va := 87 # p
+		if v0 == 0x09 then va := 101 # s
+		if v0 == 0x0E then va := 119 # t
+		if v0 == 0x0A then va := 128 # u
+		if v0 == 0x00 then va := 131 # w
+		if v0 == 0x0B then va -= 1
+		if v0 == 0x0F then va += 1
+
+		# Render currently pressed button briefly for user feedback
+		if v0 != 0x0B begin
+			if v0 != 0x0F begin
+				if v0 == 0x01 then vd := 0 # a
+				if v0 == 0x02 then vd := 1 # e
+				if v0 == 0x03 then vd := 2 # i
+				if v0 == 0x0C then vd := 3 # j
+				if v0 == 0x04 then vd := 4 # k
+				if v0 == 0x05 then vd := 5 # l
+				if v0 == 0x06 then vd := 6 # m
+				if v0 == 0x0D then vd := 7 # n
+				if v0 == 0x07 then vd := 8 # o
+				if v0 == 0x08 then vd := 9 # p
+				if v0 == 0x09 then vd := 10 # s
+				if v0 == 0x0E then vd := 11 # t
+				if v0 == 0x0A then vd := 12 # u
+				if v0 == 0x00 then vd := 13 # w
+				clear
+				render-usage
+				v0 := 30
+				delay := v0
+				loop
+					v0 := delay
+					if v0 > 0 then
+				again
+			end
+		end
+
+		if va == 0xFF then va := 136
+		if va >= 137 then va := 0
+		clear
+		render-definition
+	again
+
+: font  0x00 0x78 0x88 0x98 0x68 # a
+				0x00 0x70 0xF8 0x80 0x70 # e
+				0x20 0x00 0x60 0x20 0x70 # i
+				0x10 0x00 0x10 0x90 0x60 # j
+				0x80 0x80 0xB0 0xC0 0xB0 # k
+				0x60 0x20 0x20 0x20 0x70 # l
+				0x00 0x00 0xD0 0xA8 0x88 # m
+				0x00 0x00 0xB0 0xC8 0x88 # n
+				0x00 0x70 0x88 0x88 0x70 # o
+				0x00 0x70 0x88 0xF0 0x80 # p
+				0x00 0x70 0xC0 0x30 0xE0 # s
+				0x40 0xE0 0x40 0x48 0x30 # t
+				0x00 0x00 0x88 0x88 0x70 # u
+				0x00 0x00 0x88 0xA8 0x50 # w
+				0x20 0x40 0xF8 0x40 0x20 # <-
+				0x20 0x10 0xF8 0x10 0x20 # ->
+				0x60 0x60 0x00 0x60 0x60 # :
+				0x00 0x00 0x60 0x20 0x40 # ,
+				0x00 0x00 0x00 0x60 0x60 # .
+				0x70 0x88 0x30 0x00 0x20 # ?
+
+: font-highlighted 0xFE 0xFE 0xFE 0xFE 0xFE 0xFE 0xFE
+
+: register-storage 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+: register-storage-2 0
+: word-buffer 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 16 bytes
+: definition-buffer 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 31 bytes
+
+: wordlist
+1 0 # a
+5 0 4 1 10 2 # akesi
+3 0 5 0 # ala
+5 0 5 0 10 0 # alasa
+3 0 5 2 # ali
+4 0 7 9 0 # anpa
+4 0 7 11 1 # ante
+3 0 7 12 # anu
+4 0 13 1 7 # awen
+1 1 # e
+2 1 7 # en
+5 1 9 2 4 12 # epiku
+4 1 10 12 7 # esun
+3 2 3 8 # ijo
+3 2 4 1 # ike
+3 2 5 8 # ilo
+4 2 7 10 0 # insa
+4 3 0 4 2 # jaki
+3 3 0 7 # jan
+6 3 0 10 2 6 0 # jasima
+4 3 1 5 8 # jelo
+2 3 8 # jo
+4 4 0 5 0 # kala
+6 4 0 5 0 6 0 # kalama
+4 4 0 6 0 # kama
+4 4 0 10 2 # kasi
+3 4 1 7 # ken
+7 4 1 9 1 4 1 7 # kepeken
+15 4 2 3 1 11 1 10 0 7 11 0 4 0 5 12 # kijetesantakalu
+4 4 2 5 2 # kili
+3 4 2 7 # kin
+6 4 2 9 2 10 2 # kipisi
+5 4 2 13 1 7 # kiwen
+2 4 8 # ko
+8 4 8 4 8 10 2 5 0 # kokosila
+3 4 8 7 # kon
+2 4 12 # ku
+4 4 12 5 1 # kule
+6 4 12 5 12 9 12 # kulupu
+4 4 12 11 1 # kute
+2 5 0 # la
+6 5 0 7 9 0 7 # lanpan
+4 5 0 9 1 # lape
+4 5 0 10 8 # laso
+4 5 0 13 0 # lawa
+4 5 1 4 8 # leko
+3 5 1 7 # len
+4 5 1 11 1 # lete
+2 5 2 # li
+4 5 2 5 2 # lili
+5 5 2 7 3 0 # linja
+4 5 2 9 12 # lipu
+4 5 8 3 1 # loje
+3 5 8 7 # lon
+4 5 12 4 0 # luka
+5 5 12 4 2 7 # lukin
+4 5 12 9 0 # lupa
+2 6 0 # ma
+4 6 0 6 0 # mama
+4 6 0 7 2 # mani
+4 6 1 5 2 # meli
+4 6 1 10 8 # meso
+2 6 2 # mi
+4 6 2 3 1 # mije
+8 6 2 10 2 4 1 4 1 # misikeke
+4 6 8 4 12 # moku
+4 6 8 5 2 # moli
+5 6 8 7 10 2 # monsi
+7 6 8 7 10 12 11 0 # monsuta
+2 6 12 # mu
+3 6 12 7 # mun
+4 6 12 10 2 # musi
+4 6 12 11 1 # mute
+1 7 # n
+6 7 0 6 0 4 8 # namako
+5 7 0 7 9 0 # nanpa
+4 7 0 10 0 # nasa
+5 7 0 10 2 7 # nasin
+4 7 1 7 0 # nena
+2 7 2 # ni
+4 7 2 6 2 # nimi
+4 7 8 4 0 # noka
+1 8 # o
+3 8 4 8 # oko
+4 8 5 2 7 # olin
+3 8 7 0 # ona
+4 8 9 1 7 # open
+6 9 0 4 0 5 0 # pakala
+4 9 0 5 2 # pali
+6 9 0 5 2 10 0 # palisa
+3 9 0 7 # pan
+4 9 0 7 0 # pana
+2 9 2 # pi
+5 9 2 5 2 7 # pilin
+6 9 2 6 1 3 0 # pimeja
+4 9 2 7 2 # pini
+4 9 2 9 2 # pipi
+4 9 8 4 0 # poka
+4 9 8 4 2 # poki
+4 9 8 7 0 # pona
+2 9 12 # pu
+4 10 0 6 0 # sama
+4 10 1 5 2 # seli
+4 10 1 5 8 # selo
+4 10 1 6 1 # seme
+4 10 1 13 2 # sewi
+6 10 2 3 1 5 8 # sijelo
+4 10 2 4 1 # sike
+3 10 2 7 # sin
+4 10 2 7 0 # sina
+6 10 2 7 9 2 7 # sinpin
+7 10 2 11 1 5 1 7 # sitelen
+4 10 8 4 8 # soko
+4 10 8 7 0 # sona
+6 10 8 13 1 5 2 # soweli
+4 10 12 5 2 # suli
+4 10 12 7 8 # suno
+4 10 12 9 0 # supa
+4 10 12 13 2 # suwi
+3 11 0 7 # tan
+4 11 0 10 8 # taso
+4 11 0 13 0 # tawa
+4 11 1 5 8 # telo
+5 11 1 7 9 8 # tenpo
+4 11 8 4 2 # toki
+4 11 8 6 8 # tomo
+5 11 8 7 10 2 # tonsi
+2 11 12 # tu
+4 12 7 9 0 # unpa
+3 12 11 0 # uta
+5 12 11 0 5 0 # utala
+4 13 0 5 8 # walo
+3 13 0 7 # wan
+4 13 0 10 8 # waso
+4 13 0 13 0 # wawa
+4 13 1 4 0 # weka
+4 13 2 5 1 # wile
+2 14 -1 # <-
+2 -1 15 # ->
+1 16 # :
+1 17 # ,
+1 18 # .
+1 19 # ?
+: definitions
+12 18 48 21 9 93 134 48 136 124 9 13 141 # a: jan li jo e pilin wawa li wile toki e ijo.
+15 114 79 139 85 48 121 27 81 72 48 21 9 106 47 141 # akesi: soweli ni: ona li tawa kepeken noka mute li jo e sijelo lete.
+15 13 2 48 53 40 13 4 48 135 141 75 92 135 4 141 # ala: ijo ala li lon la ijo ali li weka. nanpa pi weka ali.
+15 13 48 136 24 21 9 13 6 40 85 48 3 9 85 141 # alasa: ijo li wile kama jo e ijo ante la ona li alasa e ona.
+5 4 48 13 72 141 # ali: ali li ijo mute.
+3 105 2 141 # anpa: sewi ala.
+3 101 2 141 # ante: sama ala.
+10 13 72 48 53 141 109 27 13 132 141 # anu: ijo mute li lon. sina kepeken ijo wan.
+6 6 2 141 121 2 141 # awen: ante ala. tawa ala.
+8 80 79 48 127 9 50 124 141 # e: nimi ni li tu e linja toki.
+17 80 79 48 50 9 80 13 72 141 85 48 124 9 13 4 79 141 # en: nimi ni li linja e nimi ijo mute. ona li toki e ijo ali ni.
+3 99 72 141 # epiku: pona mute.
+12 18 48 24 21 9 13 119 18 6 27 59 141 # esun: jan li kama jo e ijo tan jan ante kepeken mani.
+8 85 48 53 40 85 48 13 141 # ijo: ona li lon la ona li ijo.
+3 99 2 141 # ike: pona ala.
+7 18 48 26 88 27 85 141 # ilo: jan li ken pali kepeken ona.
+13 13 79 139 103 48 53 97 85 48 98 9 85 141 # insa: ijo ni: selo li lon poka ona li poki e ona.
+16 13 79 139 85 48 14 72 93 141 85 48 26 87 9 106 141 # jaki: ijo ni: ona li ike mute pilin. ona li ken pakala e sijelo.
+15 18 48 114 141 18 48 26 124 48 26 88 141 109 18 141 # jan: jan li soweli. jan li ken toki li ken pali. sina jan.
+17 15 79 40 111 127 48 24 53 141 111 132 10 111 127 48 101 141 # jasima: ilo ni la sitelen tu li kama lon. sitelen wan en sitelen tu li sama.
+3 37 116 141 # jelo: kule suno.
+12 18 48 21 9 13 40 13 79 48 13 85 141 # jo: jan li jo e ijo la ijo ni li ijo ona.
+6 22 48 114 16 122 141 # kala: kala li soweli insa telo.
+10 109 26 39 9 13 40 85 48 23 141 # kalama: sina ken kute e ijo la ona li kalama.
+17 123 79 40 13 79 48 53 2 141 120 85 48 26 53 123 24 141 # kama: tenpo ni la ijo ni li lon ala. taso ona li ken lon tenpo kama.
+27 13 79 139 85 48 53 57 141 85 48 24 21 9 134 119 116 119 16 57 141 85 48 99 9 35 105 141 # kasi: ijo ni: ona li lon ma. ona li kama jo e wawa tan suno tan insa ma. ona li pona e kon sewi.
+25 13 48 26 40 13 48 53 7 53 2 141 18 48 21 2 9 26 40 18 82 88 2 9 13 141 # ken: ijo li ken la ijo li lon anu lon ala. jan li jo ala e ken la jan o pali ala e ijo.
+16 18 48 27 13 40 18 48 21 9 13 141 13 79 48 88 141 # kepeken: jan li kepeken ijo la jan li jo e ijo. ijo ni li pali.
+15 114 79 139 85 48 115 2 141 80 79 48 76 48 71 141 # kijetesantakalu: soweli ni: ona li suli ala. nimi ni li nasa li musi.
+6 13 79 139 25 65 141 # kili: ijo ni: kasi moku.
+7 13 127 48 21 9 101 141 # kin: ijo tu li jo e sama.
+14 18 48 31 9 13 40 85 48 24 127 48 24 49 141 # kipisi: jan li kipisi e ijo la ona li kama tu li kama lili.
+19 13 79 139 134 115 48 130 9 85 40 103 85 48 6 2 7 6 49 141 # kiwen: ijo ni: wawa suli li utala e ona la selo ona li ante ala anu ante lili.
+15 13 79 139 134 48 130 9 85 40 103 85 48 6 72 141 # ko: ijo ni: wawa li utala e ona la selo ona li ante mute.
+13 18 48 124 9 124 6 53 38 92 124 99 120 141 # kokosila: jan li toki e toki ante lon kulupu pi toki pona taso.
+24 13 79 139 18 48 26 2 21 9 85 48 26 93 9 85 141 78 18 48 26 93 9 85 141 # kon: ijo ni: jan li ken ala jo e ona li ken pilin e ona. nena jan li ken pilin e ona.
+7 51 75 127 92 124 99 141 # ku: lipu nanpa tu pi toki pona.
+7 6 55 13 119 134 116 141 # kule: ante lukin ijo tan wawa suno.
+7 13 72 48 53 57 101 141 # kulupu: ijo mute li lon ma sama.
+9 39 40 18 48 24 21 9 23 141 # kute: kute la jan li kama jo e kalama.
+8 80 79 48 127 9 50 124 141 # la: nimi ni li tu e linja toki.
+13 18 48 24 21 9 13 119 18 6 27 134 72 141 # lanpan: jan li kama jo e ijo tan jan ante kepeken wawa mute.
+11 18 48 53 117 48 88 2 141 134 2 141 # lape: jan li lon supa li pali ala. wawa ala.
+11 37 25 141 37 105 141 37 92 122 115 141 # laso: kule kasi. kule sewi. kule pi telo suli.
+19 132 106 79 139 18 40 85 48 21 9 83 9 39 9 78 110 9 129 141 # lawa: wan sijelo ni: jan la ona li jo e oko e kute e nena sinpin e uta.
+12 13 79 48 21 9 110 54 132 48 107 2 141 # leko: ijo ni li jo e sinpin luka wan li sike ala.
+10 46 48 53 40 18 48 26 2 55 141 # len: len li lon la jan li ken ala lukin.
+3 102 2 141 # lete: seli ala.
+8 80 79 48 127 9 50 124 141 # li: nimi ni li tu e linja toki.
+6 115 2 141 72 2 141 # lili: suli ala. mute ala.
+3 89 33 141 # linja: palisa ko.
+10 13 79 139 85 48 26 21 9 111 141 # lipu: ijo ni: ona li ken jo e sitelen.
+3 37 129 141 # loje: kule uta.
+20 13 48 53 57 40 57 48 21 9 13 141 13 48 53 40 13 48 113 99 141 # lon: ijo li lon ma la ma li jo e ijo. ijo li lon la ijo li sona pona.
+20 132 106 79 139 18 40 85 48 26 27 9 15 27 85 141 75 127 127 132 141 # luka: wan sijelo ni: jan la ona li ken kepeken e ilo kepeken ona. nanpa tu tu wan.
+11 55 40 18 48 24 113 9 13 27 83 141 # lukin: lukin la jan li kama sona e ijo kepeken oko.
+12 13 48 115 141 120 16 2 48 21 9 2 141 # lupa: ijo li suli. taso insa ala li jo e ala.
+16 32 115 7 33 115 141 18 72 10 114 72 48 26 53 85 141 # ma: kiwen suli anu ko suli. jan mute en soweli mute li ken lon ona.
+15 18 127 48 88 9 18 49 40 18 127 79 48 58 85 141 # mama: jan tu li pali e jan lili la jan tu ni li mama ona.
+8 18 48 12 9 13 27 59 141 # mani: jan li esun e ijo kepeken mani.
+14 63 2 141 114 79 7 18 79 48 21 9 56 128 141 # meli: mije ala. soweli ni anu jan ni li jo e lupa unpa.
+12 115 2 141 49 2 141 99 2 141 14 2 141 # meso: suli ala. lili ala. pona ala. ike ala.
+19 18 75 132 48 124 121 18 75 127 141 124 79 40 18 75 132 48 62 141 # mi: jan nanpa wan li toki tawa jan nanpa tu. toki ni la jan nanpa wan li mi.
+14 60 2 141 114 79 7 18 79 48 21 9 89 128 141 # mije: meli ala. soweli ni anu jan ni li jo e palisa unpa.
+5 13 92 99 106 141 # misikeke: ijo pi pona sijelo.
+18 13 79 139 85 48 24 121 16 106 40 85 48 91 9 134 121 106 141 # moku: ijo ni: ona li kama tawa insa sijelo la ona li pana e wawa tawa sijelo.
+17 18 7 13 106 48 66 40 85 48 26 2 93 48 26 2 88 141 # moli: jan anu ijo sijelo li moli la ona li ken ala pilin li ken ala pali.
+5 97 92 110 2 141 # monsi: poka pi sinpin ala.
+12 114 79 139 85 48 91 9 93 14 121 18 141 # monsuta: soweli ni: ona li pana e pilin ike tawa jan.
+5 23 92 124 114 141 # mu: kalama pi toki soweli.
+5 13 92 105 94 141 # mun: ijo pi sewi pimeja.
+16 18 48 88 9 13 48 24 21 9 93 99 40 85 48 71 141 # musi: jan li pali e ijo li kama jo e pilin pona la ona li musi.
+3 49 2 141 # mute: lili ala.
+12 18 48 113 2 40 85 48 124 9 80 79 141 # n: jan li sona ala la ona li toki e nimi ni.
+19 93 102 53 129 141 18 48 91 9 13 53 13 72 40 85 48 13 74 141 # namako: pilin seli lon uta. jan li pana e ijo lon ijo mute la ona li ijo namako.
+9 113 79 139 13 48 49 7 72 142 # nanpa: sona ni: ijo li lili anu mute?
+16 13 79 48 88 53 77 79 139 18 48 26 2 113 9 85 141 # nasa: ijo ni li pali lon nasin ni: jan li ken ala sona e ona.
+11 13 79 53 57 139 18 48 121 27 85 141 # nasin: ijo ni lon ma: jan li tawa kepeken ona.
+22 13 79 139 57 4 48 117 141 120 57 132 48 115 48 105 141 132 106 92 93 35 141 # nena: ijo ni: ma ali li supa. taso ma wan li suli li sewi. wan sijelo pi pilin kon.
+12 18 48 124 9 13 121 18 6 27 80 79 141 # ni: jan li toki e ijo tawa jan ante kepeken nimi ni.
+4 111 53 51 141 # nimi: sitelen lon lipu.
+12 132 106 79 139 18 10 114 48 121 27 85 141 # noka: wan sijelo ni: jan en soweli li tawa kepeken ona.
+19 18 48 136 9 79 139 18 6 48 39 9 124 85 48 88 9 124 85 141 # o: jan li wile e ni: jan ante li kute e toki ona li pali e toki ona. 
+10 132 106 79 139 18 48 55 27 85 141 # oko: wan sijelo ni: jan li lukin kepeken ona.
+15 93 92 99 72 92 134 72 141 18 48 136 115 9 85 141 # olin: pilin pi pona mute pi wawa mute. jan li wile suli e ona.
+17 18 75 132 48 124 121 18 75 127 141 18 75 127 132 48 85 141 # ona: jan nanpa wan li toki tawa jan nanpa tu. jan nanpa tu wan li ona.
+8 13 75 132 141 123 75 132 141 # open: ijo nanpa wan. tenpo nanpa wan.
+5 13 92 24 14 141 # pakala: ijo pi kama ike.
+14 13 48 24 53 119 18 40 18 79 48 88 9 85 141 # pali: ijo li kama lon tan jan la jan ni li pali e ona.
+22 13 79 139 97 132 40 85 48 115 141 97 4 6 40 85 48 49 141 85 48 32 141 # palisa: ijo ni: poka wan la ona li suli. poka ali ante la ona li lili. ona li kiwen.
+3 65 33 141 # pan: moku ko.
+21 18 75 132 48 91 9 13 121 18 75 127 40 18 75 127 48 24 21 9 85 141 # pana: jan nanpa wan li pana e ijo tawa jan nanpa tu la jan nanpa tu li kama jo e ona.
+9 80 79 48 50 9 80 24 72 141 # pi: nimi ni li linja e nimi kama mute.
+4 124 16 18 141 # pilin: toki insa jan.
+5 37 92 116 2 141 # pimeja: kule pi suno ala.
+20 88 48 95 40 18 48 24 88 2 141 13 48 95 40 85 48 24 6 2 141 # pini: pali li pini la jan li kama pali ala. ijo li pini la ona li kama ante ala.
+12 114 92 49 72 141 103 85 48 134 101 32 141 # pipi: soweli pi lili mute. selo ona li wawa sama kiwen.
+3 16 2 141 # poka: insa ala.
+15 13 79 139 85 48 26 21 9 13 48 26 8 9 13 141 # poki: ijo ni: ona li ken jo e ijo li ken awen e ijo.
+14 13 48 99 40 18 72 48 136 9 13 141 14 2 141 # pona: ijo li pona la jan mute li wile e ijo. ike ala.
+7 51 75 132 92 124 99 141 # pu: lipu nanpa wan pi toki pona.
+30 13 132 48 52 141 13 127 30 48 52 141 79 40 85 127 48 101 141 79 48 26 37 48 26 115 48 26 13 4 141 # sama: ijo wan li loje. ijo tu kin li loje. ni la ona tu li sama. ni li ken kule li ken suli li ken ijo ali.
+16 93 92 116 134 141 102 48 26 135 9 17 65 141 47 2 141 # seli: pilin pi suno wawa. seli li ken weka e jaki moku. lete ala.
+3 98 13 141 # selo: poki ijo.
+5 80 92 136 113 141 # seme: nimi pi wile sona.
+9 57 116 141 57 70 141 5 2 141 # sewi: ma suno. ma mun. anpa ala.
+3 103 114 141 # sijelo: selo soweli.
+17 107 48 103 111 79 139 115 89 119 16 85 121 103 85 48 101 141 # sike: sike li selo sitelen ni: suli palisa tan insa ona tawa selo ona li sama.
+10 13 79 139 85 48 24 53 123 79 141 # sin: ijo ni: ona li kama lon tenpo ni.
+15 18 48 124 121 18 6 141 124 85 40 18 6 48 109 141 # sina: jan li toki tawa jan ante. toki ona la jan ante li sina.
+15 97 79 139 44 109 48 121 2 97 40 109 55 9 85 141 # sinpin: poka ni: lawa sina li tawa ala poka la sina lukin e ona.
+18 124 40 18 48 39 141 111 40 18 48 55 141 111 48 21 9 113 141 # sitelen: toki la jan li kute. sitelen la jan li lukin. sitelen li jo e sona.
+3 29 57 141 # soko: kili ma.
+28 44 18 48 21 9 85 141 18 48 55 9 13 48 39 9 13 48 93 9 13 40 85 48 24 21 9 113 141 # sona: lawa jan li jo e ona. jan li lukin e ijo li kute e ijo li pilin e ijo la ona li kama jo e sona.
+18 13 79 139 85 48 21 9 106 48 53 57 48 26 65 48 26 121 141 # soweli: ijo ni: ona li jo e sijelo li lon ma li ken moku li ken tawa.
+17 13 48 115 40 18 92 57 72 48 26 55 9 85 141 49 2 141 # suli: ijo li suli la jan pi ma mute li ken lukin e ona. lili ala.
+15 107 115 53 105 141 85 48 91 9 102 9 134 121 57 141 # suno: sike suli lon sewi. ona li pana e seli e wawa tawa ma.
+12 13 32 79 139 18 7 13 48 26 53 85 141 # supa: ijo kiwen ni: jan anu ijo li ken lon ona.
+4 93 65 99 141 # suwi: pilin moku pona.
+22 57 132 79 139 13 48 53 57 132 53 123 95 141 13 48 53 57 79 53 123 79 141 # tan: ma wan ni: ijo li lon ma wan lon tenpo pini. ijo li lon ma ni lon tenpo ni.
+7 13 79 10 13 6 2 141 # taso: ijo ni en ijo ante ala.
+18 123 95 40 13 48 53 57 132 141 123 79 40 13 48 53 57 6 141 # tawa: tenpo pini la ijo li lon ma wan. tenpo ni la ijo li lon ma ante.
+28 13 79 139 85 48 53 98 40 85 48 121 97 4 92 16 98 141 120 85 48 136 24 5 48 121 105 2 141 # telo: ijo ni: ona li lon poki la ona li tawa poka ali pi insa poki. taso ona li wile kama anpa li tawa sewi ala.
+16 13 4 48 121 48 24 6 27 123 141 123 48 53 57 4 141 # tenpo: ijo ali li tawa li kama ante kepeken tenpo. tenpo li lon ma ali.
+11 18 132 48 124 40 18 6 48 26 39 141 # toki: jan wan li toki la jan ante li ken kute.
+16 13 79 139 18 10 13 48 26 53 16 85 141 98 115 18 141 # tomo: ijo ni: jan en ijo li ken lon insa ona. poki suli jan.
+8 18 92 60 2 92 63 2 141 # tonsi: jan pi meli ala pi mije ala.
+17 132 10 132 48 127 141 18 48 127 9 13 40 85 48 24 127 141 # tu: wan en wan li tu. jan li tu e ijo la ona li kama tu.
+12 18 127 48 128 40 18 49 108 48 24 53 141 # unpa: jan tu li unpa la jan lili sin li kama lon.
+14 132 106 79 139 18 48 26 124 48 26 65 27 85 141 # uta: wan sijelo ni: jan li ken toki li ken moku kepeken ona.
+19 18 127 48 130 40 18 132 48 24 87 141 79 48 27 134 72 48 14 141 # utala: jan tu li utala la jan wan li kama pakala. ni li kepeken wawa mute li ike.
+5 37 92 33 105 141 # walo: kule pi ko sewi.
+5 13 141 75 49 141 # wan: ijo. nanpa lili.
+9 114 79 139 85 48 26 121 105 141 # waso: soweli ni: ona li ken tawa sewi.
+13 26 88 141 13 48 134 72 40 85 48 26 72 141 # wawa: ken pali. ijo li wawa mute la ona li ken mute.
+18 123 95 40 85 48 53 141 123 79 40 85 48 53 2 141 97 2 141 # weka: tenpo pini la ona li lon. tenpo ni la ona li lon ala. poka ala.
+24 18 48 136 9 13 40 85 48 21 9 85 40 85 48 93 99 141 6 40 85 48 93 14 141 # wile: jan li wile e ijo la ona li jo e ona la ona li pilin pona. ante la ona li pilin ike.
