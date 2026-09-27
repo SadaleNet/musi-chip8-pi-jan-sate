@@ -6,7 +6,7 @@ mi pali e musi CHIP-8 tan ni: mi pali e ilo musi pi nasin CHIP-8. mi wile e musi
 
 ### lipu nimi (LIPUNIMI.CH8)
 
-[https://johnearnest.github.io/Octo/index.html?key=jx5oYAtz](![o musi!](LIPUNIMI.PNG))
+[![o musi!](LIPUNIMI.PNG)](https://johnearnest.github.io/Octo/index.html?key=jx5oYAtz)
 
 lipu pi nimi ali pi toki pona. ona li tan [lipu Wikipesija pi nimi pi toki pona](https://tok.wikipedia.org/wiki/kulupu:nimi).
 
@@ -14,7 +14,7 @@ ken: CC-BY-SA-4.0
 
 ### ilo nanpa (SIMCALC.CH8)
 
-[https://johnearnest.github.io/Octo/index.html?key=c64FvpNG](![o musi!](SIMCALC.PNG))
+[![o musi!](SIMCALC.PNG)](https://johnearnest.github.io/Octo/index.html?key=c64FvpNG)
 
 kepeken ilo ni la sina ken nanpa
 
@@ -27,7 +27,7 @@ ken: CC0-1.0
 
 ### o sama e sitelen! (SITELEN.CH8)
 
-[https://johnearnest.github.io/Octo/index.html?key=wbsuVqJi](![o musi!](SITELEN.PNG))
+[![o musi!](SITELEN.PNG)](https://johnearnest.github.io/Octo/index.html?key=wbsuVqJi)
 
 mi pali e ona tawa tenpo musi "pali musi 2026".
 
@@ -37,7 +37,7 @@ ken: CC0-1.0
 
 ### ilo pi ante sona "saveflags/loadflags" (STORAGE.CH8)
 
-[https://johnearnest.github.io/Octo/index.html?key=dCdA6tDR](![o musi!](STORAGE.PNG))
+[![o musi!](STORAGE.PNG)](https://johnearnest.github.io/Octo/index.html?key=dCdA6tDR)
 
 kepeken ilo ni la sina ken ante e sona "saveflags/loadflags" pi nasin SuperCHIP.
 
@@ -50,7 +50,7 @@ ken: CC0-1.0
 
 ### suno pi tomo tawa (SUNOTOMO.CH8)
 
-[https://sadale.net/85/suno-pi-tomo-tawa.html](![o musi!](SUNOTOMO.PNG))
+[![o musi!](SUNOTOMO.PNG)](https://sadale.net/85/suno-pi-tomo-tawa.html)
 
 mi pali e ona tawa tenpo musi "Ludum Dare 59".
 
@@ -60,7 +60,7 @@ ken: CC0-1.0
 
 ### ilo tenpo (TIMER.CH8)
 
-[https://johnearnest.github.io/Octo/index.html?key=7GeH2Zf2](![o musi!](TIMER.PNG))
+[![o musi!](TIMER.PNG)](https://johnearnest.github.io/Octo/index.html?key=7GeH2Zf2)
 
 kepeken ilo ni la sina ken tenpo e ijo.
 
@@ -72,7 +72,7 @@ ken: CC0-1.0
 
 ## Tokdle (TOKDLE.CH8)
 
-[https://johnearnest.github.io/Octo/index.html?key=CIui3vfu](![o musi!](TOKDLE.PNG))
+[![o musi!](TOKDLE.PNG)](https://johnearnest.github.io/Octo/index.html?key=CIui3vfu)
 
 musi Wordle pi toki pona.
 
